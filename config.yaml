@@ -1,6 +1,6 @@
 ---
 name: Studio Code Server (self-hosted)
-version: "0.3.0"
+version: "0.4.0"
 slug: scs_forge
 description: Self-hosted fork of hassio-addons/addon-vscode. Bakes /config/.tools PATH and apt/dpkg dev tools into the image so they persist across addon rebuilds.
 url: https://github.com/hassio-addons/addon-vscode
@@ -18,6 +18,8 @@ init: false
 arch:
   - amd64
 uart: true
+# ホスト音声(PulseAudio)への入出力アクセス。個人用フル権限開発アドオンとして(全体TODO由来)。
+audio: true
 hassio_api: true
 hassio_role: manager
 homeassistant_api: true
