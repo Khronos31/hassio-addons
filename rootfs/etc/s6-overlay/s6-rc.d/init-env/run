@@ -33,15 +33,25 @@ if bashio::config.has_value 'env_vars'; then
         name=$(bashio::config "env_vars[${i}].name")
         value=$(bashio::config "env_vars[${i}].value")
         [ -z "${name}" ] && continue
-        # 統合ターミナル用: %q でシェル安全にクォート
+        # 統合ターミナル用: %q で任意の値を安全にクォート（$ ' " \ 空 改行 すべてOK）
         printf 'export %s=%q\n' "${name}" "${value}" >> "${SH_FILE}"
-        # SSH用 /etc/environment（pam_env）。'$' 混入は誤解釈しうるのでスキップ＋警告
-        if printf '%s' "${value}" | grep -q '[$]'; then
-            bashio::log.warning "env '${name}' は '\$' を含むため /etc/environment ではスキップ（SSHセッションのみ未反映・統合ターミナルには反映済み）"
+        # SSH用 /etc/environment（pam_env）は壊れやすいので「安全な値だけ」書く。
+        # $ " \ 改行 を含む値はスキップ＋警告（＝SSHログインを絶対に壊さない。統合ターミナルには %q で反映済み）。
+        if [[ "${value}" == *'$'* || "${value}" == *'"'* || "${value}" == *'\'* || "${value}" == *$'\n'* ]]; then
+            bashio::log.warning "env '${name}' は特殊文字(\$ \" \\ 改行)を含むため /etc/environment ではスキップ（SSHセッションのみ未反映・統合ターミナルには反映済み）"
         else
-            printf '%s="%s"\n' "${name}" "${value//\"/\\\"}" >> "${ENV_FILE}"
+            printf '%s="%s"\n' "${name}" "${value}" >> "${ENV_FILE}"
         fi
     done
 fi
 
-bashio::log.info "init-env: PATH=${EFFECTIVE_PATH} ＋ env_vars を /etc/environment・/etc/scs-env.sh に反映"
+# 対話ログインの着地ディレクトリ（cwd整合用）。config_path 参照・既定 /config。
+# oh-my-zsh custom(scs-forge.zsh) が「対話ログインでホームにいるときだけ」ここへ cd する。
+workdir="/config"
+if bashio::config.has_value 'config_path'; then
+    workdir=$(bashio::config 'config_path')
+fi
+printf 'SCS_WORKDIR="%s"\n' "${workdir}" >> "${ENV_FILE}"
+printf 'export SCS_WORKDIR=%q\n' "${workdir}" >> "${SH_FILE}"
+
+bashio::log.info "init-env: PATH=${EFFECTIVE_PATH} ＋ env_vars ＋ SCS_WORKDIR=${workdir} を /etc/environment・/etc/scs-env.sh に反映"
