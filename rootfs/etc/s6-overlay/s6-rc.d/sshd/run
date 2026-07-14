@@ -1,0 +1,8 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# SCS Forge (self-hosted): SSH デーモン（LAN直・内部22→ホスト8022）
+# ==============================================================================
+bashio::log.info 'Starting SSH daemon (LAN direct, container:22 -> host:8022)...'
+mkdir -p /run/sshd
+exec /usr/sbin/sshd -D -e -f /etc/ssh/sshd_config
