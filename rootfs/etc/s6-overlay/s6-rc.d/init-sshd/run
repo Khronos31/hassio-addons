@@ -42,4 +42,12 @@ if bashio::config.has_value 'allowed_ips'; then
 fi
 sed -i "s|^AllowUsers .*|AllowUsers ${allow}|" "${SSHD_CONFIG}" \
     || bashio::exit.nok 'Failed to set AllowUsers'
+
+# motd 二重表示の防止: UsePAM yes は pam_env(PATH-over-SSH)のために必要だが、
+# 同時に pam_motd を有効化し motd が /root/.zshrc の分と二重になる。
+# base 本来は zshrc が1回出す挙動なので、sshd の PAM から pam_motd を無効化する（pam_env は別行なので影響なし）。
+if [ -f /etc/pam.d/sshd ]; then
+    sed -i 's|^\(session.*pam_motd\.so\)|#\1|' /etc/pam.d/sshd
+fi
+
 bashio::log.info "SSH daemon configured. AllowUsers = ${allow}"
