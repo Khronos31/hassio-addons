@@ -28,6 +28,11 @@ options+=(--auth none)
 export HASS_SERVER="http://supervisor/core"
 export HASS_TOKEN="${SUPERVISOR_TOKEN:-}"
 
+# SCS Forge: 構成タブ由来の env（PATH＋env_vars）を統合ターミナルにも届ける。
+# init-env が生成。壊れても code-server を落とさない（|| true）。
+# shellcheck disable=SC1091
+[ -f /etc/scs-env.sh ] && . /etc/scs-env.sh || true
+
 # Run the code server
 cd "${config_path}" || bashio::exit.nok "Could not change working directory"
 exec code-server "${options[@]}" "${config_path}"

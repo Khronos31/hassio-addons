@@ -2,10 +2,9 @@ ARG BUILD_FROM=ghcr.io/hassio-addons/vscode/amd64:6.0.1
 # hadolint ignore=DL3006
 FROM ${BUILD_FROM}
 
-# ===== SCS Forge (self-hosted) — 公式prebuiltイメージへの phase 1 追記 =====
-# 目的②: 安定コアPATHを焼き込み → /config/.tools のツールが全プロセスで効く（settings.json注入に非依存）。
-#   esp-idf等の版churnする巨大PATHはsettings.json側に残す（${env:PATH}で合成）。
-ENV PATH="/config/.tools/bin:/config/.tools/node/bin:/config/.tools/npm-global/bin:${PATH}"
+# ===== SCS Forge (self-hosted) — 公式prebuiltイメージへの追記 =====
+# 目的②(PATH一元化)は init-env が構成タブの additional_path＋固定STANDARDから /etc/environment と
+# /etc/scs-env.sh に組む方式へ移行（環境依存パスをイメージに焼かない）。よって ENV PATH は置かない。
 
 # 目的③: リビルドで消える apt/dpkg ツールを単一RUNで焼き込み（update先頭1回・lists最後にrm）。
 #   基本 + 重量級(apt) + chrome(Google公式.deb/dpkg)。chromeはamd64専用。

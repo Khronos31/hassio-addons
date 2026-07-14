@@ -1,6 +1,6 @@
 ---
 name: Studio Code Server (self-hosted)
-version: "0.2.0"
+version: "0.3.0"
 slug: scs_forge
 description: Self-hosted fork of hassio-addons/addon-vscode. Bakes /config/.tools PATH and apt/dpkg dev tools into the image so they persist across addon rebuilds.
 url: https://github.com/hassio-addons/addon-vscode
@@ -45,6 +45,8 @@ options:
   init_commands: []
   authorized_keys: []
   allowed_ips: []
+  additional_path: []
+  env_vars: []
 schema:
   log_level: list(trace|debug|info|notice|warning|error|fatal)?
   config_path: str?
@@ -56,3 +58,10 @@ schema:
     - str
   allowed_ips:
     - str
+  # PATH 先頭に足すディレクトリ（絶対パス）。base PATH は非表示の固定末尾。
+  additional_path:
+    - "match(^/.+$)"
+  # 追加の環境変数。name は識別子形式を検証。SSH と 統合ターミナル両方へ反映。
+  env_vars:
+    - name: "match(^[A-Za-z_][A-Za-z0-9_]*$)"
+      value: str
