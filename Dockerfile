@@ -1,6 +1,7 @@
-ARG BUILD_FROM=ghcr.io/hassio-addons/vscode/amd64:6.0.1
+# ベースは公式prebuilt(fork元 addon-vscode/amd64)を直接指定。build.yaml(deprecated)を廃止し
+# build パラメータをここへ inline した。amd64専用なので固定でよい。upstream追随はこのタグを bump する。
 # hadolint ignore=DL3006
-FROM ${BUILD_FROM}
+FROM ghcr.io/hassio-addons/vscode/amd64:6.0.1
 
 # ===== SCS Forge (self-hosted) — 公式prebuiltイメージへの追記 =====
 # 目的②(PATH一元化)は init-env が構成タブの additional_path＋固定STANDARDから /etc/environment と
