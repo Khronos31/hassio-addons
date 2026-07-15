@@ -42,6 +42,11 @@ if bashio::config.has_value 'allowed_ips'; then
 fi
 sed -i "s|^AllowUsers .*|AllowUsers ${allow}|" "${SSHD_CONFIG}" \
     || bashio::exit.nok 'Failed to set AllowUsers'
+# 事後検証: sed はパターン不一致でも exit 0 なので上の `||` は発火しない（偽の安全網）。
+# sshd_config のシード AllowUsers 行が将来消える/リネームされると sed が黙って no-op になり
+# ソースIP制限が音もなく消滅する。反映後の行を厳密一致で確認し、欠落なら loud fail にする。
+grep -Fxq "AllowUsers ${allow}" "${SSHD_CONFIG}" \
+    || bashio::exit.nok "AllowUsers 反映を検証できず（sshd_config のシード行欠落の可能性）: AllowUsers ${allow}"
 
 # motd 二重表示の防止: UsePAM yes は pam_env(PATH-over-SSH)のために必要だが、
 # 同時に pam_motd を有効化し motd が /root/.zshrc の分と二重になる。
