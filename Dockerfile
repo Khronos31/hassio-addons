@@ -7,14 +7,11 @@ FROM ghcr.io/hassio-addons/vscode/amd64:6.0.1
 # 目的②(PATH一元化)は init-env が構成タブの additional_path＋固定STANDARDから /etc/environment と
 # /etc/scs-env.sh に組む方式へ移行（環境依存パスをイメージに焼かない）。よって ENV PATH は置かない。
 
-# 目的③: リビルドで消える apt ツールを単一RUNで焼き込み（update先頭1回・lists最後にrm）。
-#   ブラウザは Debian の純FOSS chromium 一本（Google Chrome は積まない・2026-07-15 決定）。
-#   ※chromium 150.0.7871.46 は Debian cherry-pick バグで headless クラッシュしたが .100 で修正済み。
-#     apt はビルド時の現行版（修正版）を引く。
+# 起動直後に必要なシステム依存だけを単一RUNで焼き込む（update先頭1回・lists最後にrm）。
+# 開発ツールは /config/.tools/bin の lazy-install ラッパーで必要時に導入する。
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         file x11-utils fonts-noto-cjk libusb-1.0-0 \
-        clang cppcheck lua5.4 chromium \
         openssh-server \
     && rm -rf /var/lib/apt/lists/*
 

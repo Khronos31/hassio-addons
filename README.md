@@ -1,7 +1,7 @@
 # scs-forge — Studio Code Server (self-hosted)
 
 公式 `hassio-addons/addon-vscode` をフォークした自作ローカルアドオン（slug `local_scs_forge`）のソース。
-`FROM ghcr.io/hassio-addons/vscode/amd64:<ver>` の prebuilt イメージに、開発ツール焼き込み・PATH一元化・
+`FROM ghcr.io/hassio-addons/vscode/amd64:<ver>` の prebuilt イメージに、必要なシステム依存・PATH一元化・
 LAN直SSH（root鍵のみ・接続元制限）を追加している。
 
 ## リポジトリ = source of truth / デプロイ

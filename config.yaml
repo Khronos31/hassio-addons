@@ -1,8 +1,8 @@
 ---
 name: Studio Code Server (self-hosted)
-version: "0.4.1"
+version: "0.4.4"
 slug: scs_forge
-description: Self-hosted fork of hassio-addons/addon-vscode. Bakes /config/.tools PATH and apt/dpkg dev tools into the image so they persist across addon rebuilds.
+description: Self-hosted fork of hassio-addons/addon-vscode. Bakes /config/.tools PATH and required system dependencies into the image.
 url: https://github.com/hassio-addons/addon-vscode
 ingress: true
 ingress_port: 1337
@@ -11,8 +11,14 @@ panel_icon: mdi:microsoft-visual-studio-code
 # LAN直SSH（phase 2）: 内部22 → ホスト8022。sshdはinit-sshdが硬化・接続元制限する。
 ports:
   22/tcp: 8022
+  8765/tcp: 18765
+  3000/tcp: 3000
+  3500/tcp: 3500
 ports_description:
   22/tcp: "SSH (root, key-only, source-restricted by allowed_ips)"
+  8765/tcp: "CC Pocket Bridge WebSocket"
+  3000/tcp: "Antigravity Deck Web UI (Tailscale)"
+  3500/tcp: "Antigravity Deck API and WebSocket (Tailscale)"
 startup: services
 init: false
 arch:
