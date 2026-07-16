@@ -1,9 +1,9 @@
 ---
 name: Studio Code Server (self-hosted)
-version: "0.4.4"
+version: "0.4.5"
 slug: scs_forge
-description: Self-hosted fork of hassio-addons/addon-vscode. Bakes /config/.tools PATH and required system dependencies into the image.
-url: https://github.com/hassio-addons/addon-vscode
+description: Self-hosted fork of hassio-addons/addon-vscode with configurable PATH, SSH, and companion-service ports.
+url: https://github.com/Khronos31/scs-forge
 ingress: true
 ingress_port: 1337
 ingress_stream: true
