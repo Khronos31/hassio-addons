@@ -13,7 +13,7 @@ Home Assistant OS には地上デジタルチューナーのドライバとフ�
 | 項目 | 説明 |
 |---|---|
 | `mirakurun_url` | mirakc / Mirakurun の URL。例 `http://192.168.1.10:40772` |
-| `recorded_path` | 録画物の置き場。既定は `/media/EPGStation` |
+| `recorded_path` | 録画物の置き場。`/media` か `/share` の下。既定は `/media/EPGStation` |
 
 データベースとサムネイルはアドオンの `/data` に置かれるので、更新しても残ります。
 
@@ -22,16 +22,6 @@ Home Assistant OS には地上デジタルチューナーのドライバとフ�
 - **サイドバー** — Home Assistant のログインを通ります。Home Assistant Cloud 経由でも開けます
 - **`http://<Home Assistant の IP>:8888`** — 認証はありません。ingress を使えない
   Android TV のクライアントなどはこちらから。要らなければ構成タブでポートを空欄にしてください
-
-## 外付けディスクへ録画する
-
-Home Assistant OS は USB ディスクを直接マウントできません。
-
-1. ディスクにラベルを付ける
-2. Samba NAS アドオンの `automount` を有効にする（ラベル名の共有ができます）
-3. **設定 → システム → ストレージ** で、その共有を cifs として追加する
-   （サーバー `172.30.32.1`、用途「メディア」）
-4. `recorded_path` を `/media/<ラベル>` に向ける
 
 ## 上流との違い
 
