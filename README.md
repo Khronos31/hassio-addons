@@ -15,4 +15,4 @@ https://github.com/Khronos31/hassio-addons
 
 | アドオン | 説明 |
 |---|---|
-| [EPGStation](epgstation) | 日本の地上デジタル放送の録画管理。チューナーは別のマシンの mirakc / Mirakurun が持つ |
+| [EPGStation](epgstation) | Mirakurun を使用した録画管理ソフト |

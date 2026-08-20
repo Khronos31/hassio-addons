@@ -1,7 +1,7 @@
 name: EPGStation
 version: "0.1.7"
 slug: epgstation
-description: "日本の地上デジタル放送の録画管理。チューナーは別のマシンの mirakc / Mirakurun が持ち、こちらは番組表・予約・録画・視聴を担当する。"
+description: "Mirakurun を使用した録画管理ソフト EPGStation。チューナーを持つ mirakc / Mirakurun が別に要ります。"
 url: https://github.com/Khronos31/hassio-addons/tree/main/epgstation
 # ⚠️ amd64 でしか動かしていない。上流のイメージは arm64 も持っているが、未確認なので書かない。
 arch:
