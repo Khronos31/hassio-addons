@@ -19,7 +19,7 @@ EPGStation の `config.yml` を直接編集します。置き場所は
 初回起動時にテンプレートから作られるので、`mirakurunPath` を自分の mirakc / Mirakurun へ
 向けてください。書式と全キーの説明は
 [上流のマニュアル](https://github.com/l3tnun/EPGStation/blob/master/doc/conf-manual.md)
-がそのまま使えます。編集は EPGStation の再読込で反映されます。
+がそのまま使えます。
 
 **構成タブに設定項目はありません。** EPGStation の設定は深さ6まで入れ子になっており、
 アドオンの `schema` が扱える上限（深さ2）に収まらないためです。
