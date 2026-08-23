@@ -1,5 +1,5 @@
 name: EPGStation
-version: "0.1.7"
+version: "0.1.8"
 slug: epgstation
 description: "Mirakurun を使用した録画管理ソフト EPGStation。チューナーを持つ mirakc / Mirakurun が別に要ります。"
 url: https://github.com/Khronos31/hassio-addons/tree/main/epgstation
@@ -11,8 +11,14 @@ startup: application
 boot: manual
 # 録画物は /media に置き、Home Assistant のメディアブラウザからも見えるようにする。
 map:
-  - media:rw
-  - share:rw
+  - type: media
+    read_only: false
+  - type: share
+    read_only: false
+  # EPGStation の config.yml をここに置く。ホスト側は
+  # /addon_configs/<リポジトリID>_epgstation/ に出て、ユーザーが直接編集できる。
+  - type: addon_config
+    read_only: false
 # 自分の ingress パスを Supervisor から引くために要る。
 hassio_api: true
 # ⚠️ LAN へ無認証で開く。EPGStation 自身にログイン機構は無い。
@@ -25,9 +31,5 @@ ports_description:
 ingress: true
 ingress_port: 8888
 panel_icon: mdi:television-classic
-options:
-  mirakurun_url: ""
-  recorded_path: "/media/EPGStation"
-schema:
-  mirakurun_url: str?
-  recorded_path: str
+# 設定項目は置かない。EPGStation の設定は深さ6まで入れ子になっており、アドオンの
+# schema が扱える上限（深さ2）に収まらない。config.yml を直接編集してもらう。
