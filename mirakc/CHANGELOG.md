@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Ingress とサイドバーを外した。UI は EPGStation。mirakc はホストの 40772 だけ
+
 ## 0.1.2
 
 - 起動時に PX-S1UD へファームを入れてから mirakc を起こす（スキャン 10 秒窓に間に合わせる）

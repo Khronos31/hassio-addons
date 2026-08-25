@@ -32,9 +32,9 @@
 
 ## 開き方
 
-- **サイドバー** — Home Assistant のログインを通ります
-- **`http://<Home Assistant の IP>:40772`** — 認証はありません。EPGStation や
-  Android TV のクライアントはこちら。要らなければ構成タブでポートを空欄にしてください
+**`http://<Home Assistant の IP>:40772`** — 認証はありません。EPGStation と
+Android TV のクライアントはこちら。要らなければ構成タブでポートを空欄にしてください。
+Ingress はありません。画面は EPGStation アドオンです。
 
 ## 上流との違い
 
