@@ -15,4 +15,5 @@ https://github.com/Khronos31/hassio-addons
 
 | アドオン | 説明 |
 |---|---|
+| [mirakc](mirakc) | PX-S1UD 向け mirakc（siano-ts / recisdb 同梱） |
 | [EPGStation](epgstation) | Mirakurun を使用した録画管理ソフト |

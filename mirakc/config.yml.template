@@ -1,0 +1,60 @@
+server:
+  addrs:
+    - http: 0.0.0.0:40772
+
+epg:
+  cache-dir: /data/epg
+
+# 録画は EPGStation アドオンが HTTP で引きます。mirakc 側では録りません。
+
+channels:
+  - name: TOKYO MX
+    type: GR
+    channel: T16
+  - name: フジテレビジョン
+    type: GR
+    channel: T21
+  - name: TBS
+    type: GR
+    channel: T22
+  - name: テレビ東京
+    type: GR
+    channel: T23
+  - name: テレビ朝日
+    type: GR
+    channel: T24
+  - name: 日本テレビ
+    type: GR
+    channel: T25
+  - name: NHK Eテレ東京
+    type: GR
+    channel: T26
+  - name: NHK総合・東京
+    type: GR
+    channel: T27
+  - name: チバテレビ
+    type: GR
+    channel: T30
+  - name: tvk
+    type: GR
+    channel: T31
+  - name: テレ玉
+    type: GR
+    channel: T32
+
+tuners:
+  - name: "PX-S1UD #0"
+    types:
+      - GR
+    command: >-
+      env PX_S1UD_ADAPTER=0 /usr/local/bin/px-s1ud-stream {{{channel}}}
+  - name: "PX-S1UD #1"
+    types:
+      - GR
+    command: >-
+      env PX_S1UD_ADAPTER=1 /usr/local/bin/px-s1ud-stream {{{channel}}}
+
+# チューナー出力は生TS。復号はジョブ（EPGスキャン）には掛けない。
+filters:
+  decode-filter:
+    command: /usr/bin/recisdb decode --input - -

@@ -1,8 +1,8 @@
 #!/bin/sh
 # EPGStation を Home Assistant のアドオンとして起動する。
 #
-# チューナーは Home Assistant OS では扱えないので、mirakc / Mirakurun は別のマシンに
-# 置き、ここからは HTTP で問い合わせるだけにする。EPGStation 自身はチューナーに触らない。
+# チューナーは EPGStation 自身は触らない。同じホストの mirakc アドオンか、
+# 別マシンの mirakc / Mirakurun へ HTTP で問い合わせる。
 #
 # 設定は上流と同じく config.yml をそのまま書いてもらう。置き場所は
 #   /addon_configs/<リポジトリID>_epgstation/config.yml

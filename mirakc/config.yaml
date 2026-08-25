@@ -1,0 +1,29 @@
+name: mirakc
+version: "0.1.2"
+slug: mirakc
+description: "PX-S1UD 向け mirakc。siano-ts と recisdb を同梱し、HAOS 上で地上デジタルを受信します。"
+url: https://github.com/Khronos31/hassio-addons/tree/main/mirakc
+# ⚠️ amd64 でしか動かしていない。recisdb の公式 .deb が amd64 / arm64 だが、
+#    HAOS 実機はまだ amd64 だけ。
+arch:
+  - amd64
+init: false
+startup: application
+boot: auto
+timeout: 30
+usb: true
+udev: true
+realtime: true
+hassio_api: true
+map:
+  - type: addon_config
+    read_only: false
+ports:
+  40772/tcp: 40772
+ports_description:
+  40772/tcp: "mirakc の HTTP API（認証なし）"
+ingress: true
+ingress_port: 40772
+panel_icon: mdi:antenna
+watchdog: http://[HOST]:[PORT:40772]/api/version
+# 設定は config.yml を直接編集。schema の深さ制限に tuner/channel の入れ子は収まらない。

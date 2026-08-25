@@ -1,0 +1,29 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+set -eu
+
+if [ $# -ne 1 ]; then
+    echo "Usage: px-s1ud-stream T13..T62" >&2
+    exit 2
+fi
+
+channel=$1
+phys=${channel#T}
+
+case $channel in
+    T1[3-9]|T[2-5][0-9]|T6[0-2]) ;;
+    *)
+        echo "Unsupported terrestrial channel: $channel" >&2
+        exit 2
+        ;;
+esac
+
+device=${PX_S1UD_ADAPTER:-0}
+firmware=${PX_S1UD_FIRMWARE:-/lib/firmware/isdbt_rio.inp}
+
+sleep "${PX_S1UD_SETTLE_SECONDS:-0}"
+
+exec /usr/local/bin/siano-ts \
+    --channel "$phys" \
+    --device "$device" \
+    --firmware "$firmware"
