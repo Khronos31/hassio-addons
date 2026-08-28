@@ -1,0 +1,75 @@
+---
+name: Studio Code Server (self-hosted)
+version: "0.4.5"
+slug: scs_forge
+description: Self-hosted fork of hassio-addons/addon-vscode with configurable PATH, SSH, and companion-service ports.
+url: https://github.com/Khronos31/scs-forge
+ingress: true
+ingress_port: 1337
+ingress_stream: true
+panel_icon: mdi:microsoft-visual-studio-code
+# LAN直SSH（phase 2）: 内部22 → ホスト8022。sshdはinit-sshdが硬化・接続元制限する。
+ports:
+  22/tcp: 8022
+  8765/tcp: 18765
+  3000/tcp: 3000
+  3500/tcp: 3500
+ports_description:
+  22/tcp: "SSH (root, key-only, source-restricted by allowed_ips)"
+  8765/tcp: "CC Pocket Bridge WebSocket"
+  3000/tcp: "Antigravity Deck Web UI (Tailscale)"
+  3500/tcp: "Antigravity Deck API and WebSocket (Tailscale)"
+startup: services
+init: false
+arch:
+  - amd64
+uart: true
+# ホスト音声(PulseAudio)への入出力アクセス。個人用フル権限開発アドオンとして(全体TODO由来)。
+audio: true
+hassio_api: true
+hassio_role: manager
+homeassistant_api: true
+map:
+  - type: addons
+    read_only: false
+  - type: all_addon_configs
+    read_only: false
+  - type: backup
+    read_only: false
+  - type: homeassistant_config
+    read_only: false
+    path: /config
+  - type: media
+    read_only: false
+  - type: share
+    read_only: false
+  - type: ssl
+    read_only: false
+services:
+  - mysql:want
+  - mqtt:want
+options:
+  packages: []
+  init_commands: []
+  authorized_keys: []
+  allowed_ips: []
+  additional_path: []
+  env_vars: []
+schema:
+  log_level: list(trace|debug|info|notice|warning|error|fatal)?
+  config_path: str?
+  packages:
+    - str
+  init_commands:
+    - str
+  authorized_keys:
+    - str
+  allowed_ips:
+    - str
+  # PATH 先頭に足すディレクトリ（絶対パス）。base PATH は非表示の固定末尾。
+  additional_path:
+    - "match(^/.+$)"
+  # 追加の環境変数。name は識別子形式を検証。SSH と 統合ターミナル両方へ反映。
+  env_vars:
+    - name: "match(^[A-Za-z_][A-Za-z0-9_]*$)"
+      value: str

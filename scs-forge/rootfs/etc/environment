@@ -1,0 +1,3 @@
+# init-env（oneshot）が起動時にこのファイルを上書きし、構成タブの additional_path＋env_vars を反映する。
+# ここに置くのは init-env が走る前の“安全なフォールバック”（base PATH のみ・環境依存パスは含めない）。
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"

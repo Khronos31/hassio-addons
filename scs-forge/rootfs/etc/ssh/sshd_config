@@ -1,0 +1,56 @@
+# SCS Forge (self-hosted) — LAN直SSH / root・鍵のみ・接続元制限
+# AllowUsers は init-sshd が config の allowed_ips から root@<ip> へ書き換える。
+
+# Basics
+Port 22
+AddressFamily any
+ListenAddress 0.0.0.0
+TCPKeepAlive no
+ClientAliveInterval 600
+ClientAliveCountMax 3
+UseDNS no
+
+# Logging（接続元IPの実測に使う）
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# Security
+StrictModes yes
+HostKey /data/ssh_host_ed25519_key
+
+# Cryptography: OpenSSH の安全な既定に任せる（narrow指定はWindows等クライアントでMAC不整合を起こしたため撤去）。
+# 既定でも弱いアルゴリズムは除外済み。必要なら将来 `-<weak>` の減算形で絞る（Advanced SSH方式）。
+
+# Authentication — root・鍵のみ・パスワード経路は全封鎖
+LoginGraceTime 120
+MaxAuthTries 6
+MaxSessions 10
+MaxStartups 10:30:100
+PermitRootLogin prohibit-password
+AllowUsers root
+PubkeyAuthentication yes
+PasswordAuthentication no
+PermitEmptyPasswords no
+KbdInteractiveAuthentication no
+HostbasedAuthentication no
+IgnoreRhosts yes
+AuthorizedKeysFile /etc/ssh/authorized_keys
+
+# Environment: PATH-over-SSH は /etc/environment を pam_env 経由で反映（UsePAM yes 必須）。
+UsePAM yes
+PermitUserEnvironment no
+AcceptEnv LANG LC_*
+
+# Forwarding / Tunnel — 全て無効（最小権限）
+X11Forwarding no
+PermitTunnel no
+AllowTcpForwarding no
+AllowAgentForwarding no
+GatewayPorts no
+
+# Messages
+Banner none
+PrintMotd no
+
+# SFTP（root ログインなので有効）
+Subsystem sftp /usr/lib/openssh/sftp-server

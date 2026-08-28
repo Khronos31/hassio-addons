@@ -1,0 +1,32 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# SCS Forge (self-hosted): 起動時ユーザースクリプト機構（Termux ~/.termux/boot 風）
+#   /config/scs-forge/boot.d/ 配下の実行可能スクリプトを、アドオン起動時に
+#   setsid でバックグラウンド起動する（長時間実行の watchdog 等でもブロックしない）。
+#   非致命——どれが失敗してもアドオンは落とさない。init-env の後に走る。
+#   fire-and-forget（s6 は監視しない）。常駐物の再起動は各スクリプト自身の責務。
+# ==============================================================================
+readonly BOOT_D=/config/scs-forge/boot.d
+readonly LOG=/config/scs-forge/boot.log
+
+# 構成タブ由来の env（PATH＝additional_path、env_vars）を boot.d スクリプトにも継承させる。
+# s6 サービスは pam_env(/etc/environment) も通らないので、init-env が生成した scs-env.sh を source。
+# shellcheck disable=SC1091
+[ -f /etc/scs-env.sh ] && . /etc/scs-env.sh || true
+
+mkdir -p "${BOOT_D}" 2>/dev/null || true
+
+count=0
+if [ -d "${BOOT_D}" ]; then
+    for f in "${BOOT_D}"/*; do
+        [ -f "${f}" ] && [ -x "${f}" ] || continue
+        bashio::log.info "boot.d: launching $(basename "${f}")"
+        {
+            echo "===== $(date '+%F %T') launch $(basename "${f}") ====="
+        } >> "${LOG}" 2>/dev/null || true
+        setsid "${f}" >> "${LOG}" 2>&1 &
+        count=$((count + 1))
+    done
+fi
+bashio::log.info "boot.d: ${count} script(s) launched from ${BOOT_D}"

@@ -1,0 +1,58 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# SCS Forge (self-hosted): LAN直SSH の設定（root・鍵のみ・接続元制限）
+# config の authorized_keys / allowed_ips を sshd_config・authorized_keys に反映する。
+# ==============================================================================
+readonly SSHD_CONFIG=/etc/ssh/sshd_config
+readonly AUTHORIZED_KEYS=/etc/ssh/authorized_keys
+readonly HOST_KEY=/data/ssh_host_ed25519_key
+
+mkdir -p /run/sshd
+
+# ホスト鍵を /data に永続（無ければ生成）
+if ! bashio::fs.file_exists "${HOST_KEY}"; then
+    bashio::log.notice 'ED25519 host key missing, generating...'
+    ssh-keygen -t ed25519 -f "${HOST_KEY}" -N "" \
+        || bashio::exit.nok 'Failed to generate ED25519 host key'
+fi
+
+# authorized_keys を config から反映（毎回作り直し）
+: > "${AUTHORIZED_KEYS}"
+if bashio::config.has_value 'authorized_keys'; then
+    while read -r key; do
+        [ -n "${key}" ] && echo "${key}" >> "${AUTHORIZED_KEYS}"
+    done <<< "$(bashio::config 'authorized_keys')"
+fi
+chmod 600 "${AUTHORIZED_KEYS}"
+
+if [ ! -s "${AUTHORIZED_KEYS}" ]; then
+    bashio::log.warning 'authorized_keys が空です。SSH ログインは誰もできません。'
+    bashio::log.warning 'HA の構成タブで authorized_keys に公開鍵を追加してください。'
+fi
+
+# allowed_ips → AllowUsers root@<ip> ...（空なら root＝全送信元だが鍵で防御）
+allow="root"
+if bashio::config.has_value 'allowed_ips'; then
+    allow=""
+    while read -r ip; do
+        [ -n "${ip}" ] && allow="${allow} root@${ip}"
+    done <<< "$(bashio::config 'allowed_ips')"
+    allow="${allow# }"
+fi
+sed -i "s|^AllowUsers .*|AllowUsers ${allow}|" "${SSHD_CONFIG}" \
+    || bashio::exit.nok 'Failed to set AllowUsers'
+# 事後検証: sed はパターン不一致でも exit 0 なので上の `||` は発火しない（偽の安全網）。
+# sshd_config のシード AllowUsers 行が将来消える/リネームされると sed が黙って no-op になり
+# ソースIP制限が音もなく消滅する。反映後の行を厳密一致で確認し、欠落なら loud fail にする。
+grep -Fxq "AllowUsers ${allow}" "${SSHD_CONFIG}" \
+    || bashio::exit.nok "AllowUsers 反映を検証できず（sshd_config のシード行欠落の可能性）: AllowUsers ${allow}"
+
+# motd 二重表示の防止: UsePAM yes は pam_env(PATH-over-SSH)のために必要だが、
+# 同時に pam_motd を有効化し motd が /root/.zshrc の分と二重になる。
+# base 本来は zshrc が1回出す挙動なので、sshd の PAM から pam_motd を無効化する（pam_env は別行なので影響なし）。
+if [ -f /etc/pam.d/sshd ]; then
+    sed -i 's|^\(session.*pam_motd\.so\)|#\1|' /etc/pam.d/sshd
+fi
+
+bashio::log.info "SSH daemon configured. AllowUsers = ${allow}"
