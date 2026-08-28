@@ -1,6 +1,6 @@
-# Studio Code Server (self-hosted)
+# Studio Code Server
 
-SCS Forge runs [code-server](https://github.com/coder/code-server) inside a
+This add-on runs [code-server](https://github.com/coder/code-server) inside a
 Home Assistant add-on, so that a Home Assistant configuration can be edited in
 a browser. It inherits the standard Studio Code Server add-on behavior from
 the upstream project and adds the configuration described below.
@@ -23,7 +23,7 @@ init_commands: []
 - `init_commands`: shell commands run at each add-on start. They run with the
   add-on's privileges, so use only trusted commands.
 
-## SCS Forge options
+## Additional options
 
 ```yaml
 authorized_keys: []
@@ -56,18 +56,23 @@ Name/value pairs added to the integrated terminal and SSH environments. Do not
 put credentials in add-on configuration unless you accept that Home Assistant
 will store them there.
 
+The add-on has access to USB devices and the host udev database for hardware
+development. It also includes `bluetoothctl` from the Debian `bluez` package.
+Host D-Bus access is enabled so that Bluetooth adapters managed by the host
+can be inspected and controlled.
+
 ## Published ports
 
 | Container port | Default host port | Purpose |
 | --- | ---: | --- |
 | `22/tcp` | `8022` | SSH, key-only and source-restricted when configured. |
-| `8765/tcp` | `18765` | CC Pocket Bridge WebSocket. |
-| `3000/tcp` | `3000` | Antigravity Deck web UI. |
-| `3500/tcp` | `3500` | Antigravity Deck API and WebSocket. |
+| `8765/tcp` | `18765` | WebSocket service. |
+| `3000/tcp` | `3000` | Web interface. |
+| `3500/tcp` | `3500` | API and WebSocket service. |
 
 Only publish ports required by services you operate, and restrict access to a
 trusted LAN or an authenticated overlay network. The companion services behind
-these ports are configured independently of SCS Forge.
+these ports are configured independently of the add-on.
 
 ## Resetting editor settings
 
@@ -76,13 +81,13 @@ If the base add-on's editor settings need to be restored, run
 
 ## Support
 
-This fork is maintained independently. For SCS Forge-specific behavior, open
+This add-on is maintained independently. For add-on-specific behavior, open
 an issue in this repository. For code-server itself, consult the
 [code-server project](https://github.com/coder/code-server). Upstream Home
-Assistant Community Add-ons support channels cannot support this fork.
+Assistant Community Add-ons support channels cannot support this add-on.
 
 ## License
 
-SCS Forge is distributed under the [MIT License](LICENSE). It contains work
+This add-on is distributed under the [MIT License](LICENSE). It contains work
 from the upstream Studio Code Server add-on by the Home Assistant Community
 Add-ons project.

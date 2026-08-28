@@ -1,7 +1,7 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# SCS Forge (self-hosted): 起動時ユーザースクリプト機構（Termux ~/.termux/boot 風）
+# Studio Code Server: 起動時ユーザースクリプト機構（Termux ~/.termux/boot 風）
 #   /config/scs-forge/boot.d/ 配下の実行可能スクリプトを、アドオン起動時に
 #   setsid でバックグラウンド起動する（長時間実行の watchdog 等でもブロックしない）。
 #   非致命——どれが失敗してもアドオンは落とさない。init-env の後に走る。

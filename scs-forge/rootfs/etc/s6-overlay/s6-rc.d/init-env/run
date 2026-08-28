@@ -1,7 +1,7 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# SCS Forge (self-hosted): 構成タブの additional_path / env_vars を
+# Studio Code Server: 構成タブの additional_path / env_vars を
 #   /etc/environment（SSH: pam_env が読む）と /etc/scs-env.sh（統合ターミナル:
 #   code-server/run が source）の両方へ反映する。base PATH は固定の末尾。
 # ==============================================================================

@@ -1,9 +1,11 @@
 ---
-name: Studio Code Server (self-hosted)
-version: "0.4.5"
+name: Studio Code Server
+version: "0.5.0"
 slug: scs_forge
-description: Self-hosted fork of hassio-addons/addon-vscode with configurable PATH, SSH, and companion-service ports.
-url: https://github.com/Khronos31/scs-forge
+description: >-
+  Browser-based development environment for Home Assistant with configurable
+  tools, SSH, and service ports.
+url: https://github.com/Khronos31/hassio-addons/tree/main/scs-forge
 ingress: true
 ingress_port: 1337
 ingress_stream: true
@@ -16,16 +18,19 @@ ports:
   3500/tcp: 3500
 ports_description:
   22/tcp: "SSH (root, key-only, source-restricted by allowed_ips)"
-  8765/tcp: "CC Pocket Bridge WebSocket"
-  3000/tcp: "Antigravity Deck Web UI (Tailscale)"
-  3500/tcp: "Antigravity Deck API and WebSocket (Tailscale)"
+  8765/tcp: "WebSocket service"
+  3000/tcp: "Web interface"
+  3500/tcp: "API and WebSocket service"
 startup: services
 init: false
 arch:
   - amd64
 uart: true
-# ホスト音声(PulseAudio)への入出力アクセス。個人用フル権限開発アドオンとして(全体TODO由来)。
+# ホスト音声(PulseAudio)への入出力アクセス。
 audio: true
+usb: true
+udev: true
+host_dbus: true
 hassio_api: true
 hassio_role: manager
 homeassistant_api: true

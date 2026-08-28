@@ -1,7 +1,7 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# SCS Forge (self-hosted): LAN直SSH の設定（root・鍵のみ・接続元制限）
+# Studio Code Server: LAN直SSH の設定（root・鍵のみ・接続元制限）
 # config の authorized_keys / allowed_ips を sshd_config・authorized_keys に反映する。
 # ==============================================================================
 readonly SSHD_CONFIG=/etc/ssh/sshd_config

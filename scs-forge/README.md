@@ -1,20 +1,21 @@
-# SCS Forge
+# Studio Code Server
 
-SCS Forge is a self-hosted Home Assistant add-on based on
+Studio Code Server is a Home Assistant add-on based on
 [hassio-addons/addon-vscode](https://github.com/hassio-addons/addon-vscode).
 It provides Studio Code Server (code-server) for editing a Home Assistant
-installation in the browser, with a few additions intended for a persistent,
-self-hosted development environment:
+installation in the browser, with additions for a persistent development
+environment:
 
 - an extensible `PATH` and environment-variable configuration;
 - optional key-only SSH access with an allowlist of source addresses;
-- optional external ports for companion services such as CC Pocket Bridge and
-  Antigravity Deck;
+- optional external ports for local web, API, and WebSocket services;
+- USB and udev access for development hardware, plus host D-Bus access for
+  Bluetooth tools;
 - a small set of runtime system dependencies, with heavyweight development
   tools installed on demand instead of baked into the image.
 
-This is an independent, AMD64-only fork. It is not affiliated with, supported
-by, or a drop-in replacement for the Home Assistant Community Add-ons project.
+This add-on is AMD64-only and is maintained independently from the upstream
+Home Assistant Community Add-ons project.
 
 ## Installation
 
@@ -22,19 +23,21 @@ by, or a drop-in replacement for the Home Assistant Community Add-ons project.
 1. From the overflow menu, select **Repositories** and add:
 
    ```text
-   https://github.com/Khronos31/scs-forge
+   https://github.com/Khronos31/hassio-addons
    ```
 
-1. Find **Studio Code Server (self-hosted)**, install it, then start it.
+1. Find **Studio Code Server**, install it, then start it.
 1. Open the add-on's Web UI through Home Assistant.
 
-The add-on runs with broad access to the Home Assistant configuration and
-selected Supervisor APIs. Treat it as a trusted administrator tool.
+The add-on runs with broad access to the Home Assistant configuration,
+selected Supervisor APIs, USB devices, and the host D-Bus. Treat it as a
+trusted administrator tool and do not expose its SSH or service ports to
+untrusted networks.
 
 ## Configuration
 
 The base options (`log_level`, `config_path`, `packages`, and `init_commands`)
-follow the upstream Studio Code Server add-on. SCS Forge adds the following:
+follow the upstream Studio Code Server add-on. This add-on adds the following:
 
 | Option | Purpose |
 | --- | --- |
@@ -48,8 +51,8 @@ SSH is not enabled merely by publishing port `22/tcp`: configure both
 this port directly to the public internet.
 
 The optional `8765/tcp`, `3000/tcp`, and `3500/tcp` ports are intended for
-locally trusted companion services. They are not authenticated by this add-on;
-publish them only on a trusted LAN or an authenticated overlay network.
+locally trusted services. They are not authenticated by this add-on; publish
+them only on a trusted LAN or an authenticated overlay network.
 
 See [DOCS.md](DOCS.md) for the base configuration reference and operational
 notes.
@@ -68,9 +71,9 @@ and test the resulting add-on before publishing a release.
 
 ## Upstream and license
 
-SCS Forge contains and modifies work from
+This add-on contains and modifies work from
 [Home Assistant Community Add-ons: Studio Code Server](https://github.com/hassio-addons/addon-vscode).
 Upstream documentation and issue trackers do not provide support for this
-fork. File SCS Forge-specific issues in this repository.
+add-on. File add-on-specific issues in this repository.
 
 Distributed under the [MIT License](LICENSE).

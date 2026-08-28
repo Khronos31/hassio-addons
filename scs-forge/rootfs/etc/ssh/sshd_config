@@ -1,4 +1,4 @@
-# SCS Forge (self-hosted) — LAN直SSH / root・鍵のみ・接続元制限
+# Studio Code Server — LAN直SSH / root・鍵のみ・接続元制限
 # AllowUsers は init-sshd が config の allowed_ips から root@<ip> へ書き換える。
 
 # Basics
