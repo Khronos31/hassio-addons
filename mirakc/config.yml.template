@@ -7,6 +7,12 @@ epg:
 
 # 録画は EPGStation アドオンが HTTP で引きます。mirakc 側では録りません。
 
+# この一覧は関東の地デジと最小限のBS/CSだけを載せた例です。受信地域・受信環境に合わせて編集してください。
+# jobs.scan-services は、ここに記載済みの物理チャンネル内からサービスを見つけます。RFチャンネル自体は探索しません。
+# 同梱ラッパーの表記: GR=T13〜T62、BS=奇数トランスポンダをBS01_0のように指定、CS=偶数のCS2〜CS24。
+# 表記として有効でも、実際に放送中または受信可能とは限りません。手作業で一覧を整えた後、mirakcが各項目のサービスとEPGをスキャンします。
+# https://github.com/mirakc/mirakc/blob/main/docs/config.md#channels
+
 channels:
   - name: TOKYO MX
     type: GR

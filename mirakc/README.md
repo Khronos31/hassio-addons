@@ -19,7 +19,16 @@ Home Assistant OS のカーネルドライバに依存せず、ユーザ空間�
 ## 設定
 
 初回起動で `/addon_configs/<リポジトリID>_mirakc/config.yml` にテンプレートがコピーされます。
-チャンネルとチューナー本数はそこを編集してください。構成タブに項目はありません。
+同梱テンプレートは関東の地デジと最小限のBS/CSだけを載せた例です。受信地域と受信環境に
+合わせて `channels` を編集してください。構成タブに項目はありません。
+
+mirakc の `jobs.scan-services` は、`channels` に記載済みの物理チャンネル内からサービスを
+見つける機能であり、受信可能なRFチャンネル自体を探索する機能ではありません。このアドオンの
+同梱ラッパーが受け付ける表記は、地デジが `T13`〜`T62`、BSが奇数トランスポンダを
+`BS01_0` のように表す形式、CSが偶数の `CS2`〜`CS24` です。表記として有効でも、その地域や
+受信設備で放送中・受信可能とは限りません。手作業で受信可能な一覧を設定すれば、mirakcは
+その各項目に対してサービスとEPGをスキャンします。詳細は
+[upstream mirakcのchannels設定](https://github.com/mirakc/mirakc/blob/main/docs/config.md#channels)を参照してください。
 
 PX-Q3U4 を検出し、`it930x-firmware.bin` の有効なキャッシュがない場合だけ、PLEX の
 Web サイトへ HTTPS 接続して公式ドライバZIPを取得します。ZIP、内部のSYS、生成物を固定の

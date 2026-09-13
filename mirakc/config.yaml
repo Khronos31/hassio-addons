@@ -1,5 +1,5 @@
 name: mirakc
-version: "0.2.0"
+version: "0.2.1"
 slug: mirakc
 description: "PX-S1UD / PX-Q3U4 向け mirakc。ユーザ空間ドライバを同梱し、Q3U4 ファームウェアは検証付きで実行時取得します。"
 url: https://github.com/Khronos31/hassio-addons/tree/main/mirakc
