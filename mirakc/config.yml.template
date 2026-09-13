@@ -41,6 +41,13 @@ channels:
   - name: テレ玉
     type: GR
     channel: T32
+  - name: NHK BS
+    type: BS
+    channel: BS15_0
+  - name: ショップチャンネル
+    type: CS
+    channel: CS8
+    services: [55]
 
 tuners:
   - name: "PX-S1UD #0"
@@ -53,6 +60,50 @@ tuners:
       - GR
     command: >-
       env PX_S1UD_ADAPTER=1 /usr/local/bin/px-s1ud-stream {{{channel}}}
+  - name: "PX-Q3U4 #0"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3U4 #1"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3U4 #2"
+    types:
+      - GR
+    command: >-
+      env PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3U4 #3"
+    types:
+      - GR
+    command: >-
+      env PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3U4 #4"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_RECEIVER=4 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3U4 #5"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_RECEIVER=5 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3U4 #6"
+    types:
+      - GR
+    command: >-
+      env PX4_RECEIVER=6 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3U4 #7"
+    types:
+      - GR
+    command: >-
+      env PX4_RECEIVER=7 /usr/local/bin/px4-ts-stream {{{channel}}}
 
 # チューナー出力は生TS。復号はジョブ（EPGスキャン）には掛けない。
 filters:

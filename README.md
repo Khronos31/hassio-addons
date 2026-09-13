@@ -15,6 +15,6 @@ https://github.com/Khronos31/hassio-addons
 
 | アドオン | 説明 |
 |---|---|
-| [mirakc](mirakc) | PX-S1UD 向け mirakc（siano-ts / recisdb 同梱） |
+| [mirakc](mirakc) | PX-S1UD / PX-Q3U4 向け mirakc（siano-userland / px4-userland / recisdb 同梱。Q3U4 ファームウェアは検証付きで実行時取得） |
 | [EPGStation](epgstation) | Mirakurun を使用した録画管理ソフト |
 | [Studio Code Server](scs-forge) | Home Assistant向けのブラウザー開発環境 |

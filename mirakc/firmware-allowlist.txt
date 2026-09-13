@@ -1,0 +1,4 @@
+# filename<TAB>size<TAB>sha256
+# Additional hashes require provenance, size/hash, and PX-Q3U4 hardware-test
+# evidence to be recorded and reviewed.
+it930x-firmware.bin	2169	5213a5a38872661277a2cc1b2dfdfe88faf06f41205f460f3b51857f0568b484

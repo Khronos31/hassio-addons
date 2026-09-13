@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+- siano-userland と px4-userland を固定ソース付きで同梱
+- PX-Q3U4 検出時に、PLEX の公式ドライバから固定ハッシュ検証付きでファームウェアを生成し、アドオン設定領域へ永続キャッシュ
+- 取得または検証に失敗した場合は、既存キャッシュを保護し PX-S1UD のみで継続
+- nns779/px4_drv v0.2.1 の fwtool、fwinfo.tsv、固定ソース、GPL-2.0 ライセンスを同梱
+
 ## 0.1.3
 
 - Ingress とサイドバーを外した。UI は EPGStation。mirakc はホストの 40772 だけ

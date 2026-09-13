@@ -1,7 +1,7 @@
 name: mirakc
-version: "0.1.3"
+version: "0.2.0"
 slug: mirakc
-description: "PX-S1UD 向け mirakc。siano-ts と recisdb を同梱し、HAOS 上で地上デジタルを受信します。"
+description: "PX-S1UD / PX-Q3U4 向け mirakc。ユーザ空間ドライバを同梱し、Q3U4 ファームウェアは検証付きで実行時取得します。"
 url: https://github.com/Khronos31/hassio-addons/tree/main/mirakc
 # ⚠️ amd64 でしか動かしていない。recisdb の公式 .deb が amd64 / arm64 だが、
 #    HAOS 実機はまだ amd64 だけ。
