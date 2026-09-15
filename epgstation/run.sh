@@ -15,7 +15,24 @@ set -eu
 
 USER_CFG=/config/config.yml        # addon_config マウント。設定の正本
 APP_CFG=/app/config/config.yml     # 上流がハードコードしている読み込み先
+RECORDED_AUDIO_PROFILE_AWK=/app/config/recorded-audio-profile.awk
+RECORDED_AUDIO_PROFILE_TS=/app/config/recorded-audio-profile-ts.yml
+RECORDED_AUDIO_PROFILE_ENCODED=/app/config/recorded-audio-profile-encoded.yml
+RECORDED_AUDIO_PROFILE_MP3_TS=/app/config/recorded-audio-profile-mp3-ts.yml
+RECORDED_AUDIO_PROFILE_MP3_ENCODED=/app/config/recorded-audio-profile-mp3-encoded.yml
+RECORDED_AUDIO_PROFILE_MIGRATOR=/app/config/migrate-recorded-audio-profile.sh
+OPTIONAL_RECORDED_AUDIO_PROFILE_MIGRATION=/app/config/run-optional-recorded-audio-migration.sh
 
+# EPGStation の v2.10.0 テンプレートへ、HA Media Source 用の音声プロファイルを
+# 初回生成時に追加する。既存ユーザーの config.yml にも起動時に冪等適用する。
+# migrator は同一ディレクトリの一時ファイルで検証してから、初回だけ元 config の backup を作り、
+# atomic mv する。構造不正・重複時は元ファイルを変更せず失敗する。
+# この移行は任意機能なので失敗しても警告だけ出してEPGStationの起動を続ける。
+#
+# %SS% は EPGStation の仕様上、encoded では再生位置 (秒)、ts では空文字に置換される。
+# そのため ts は EPGStation が pipe:0 へファイルを流し、encoded は %INPUT% のファイル入力を
+# 使う。AACプロファイルだけが -frag_duration を使う音声専用 fMP4 で、MP3プロファイルは
+# fragment を持たない連続した raw MP3 を出力する（APIのContent-Typeはvideo/mp4のまま）。
 # ---------------------------------------------------------------- 初回だけ生成
 # ⚠️ 土台は同梱テンプレを丸ごと使う。最小構成を手書きすると stream: ブロックごと
 #    落ちて、/api/config の isEnableTSLiveStream が false になり「放映中」タブが
@@ -34,6 +51,13 @@ HEADER
             -e "s|%ROOT%/thumbnail|/data/thumbnail|g" \
             /app/config/config.yml.template
     } > "$USER_CFG"
+    "$OPTIONAL_RECORDED_AUDIO_PROFILE_MIGRATION" "$RECORDED_AUDIO_PROFILE_MIGRATOR" --new "$USER_CFG" \
+        "$RECORDED_AUDIO_PROFILE_AWK" "$RECORDED_AUDIO_PROFILE_TS" "$RECORDED_AUDIO_PROFILE_ENCODED" \
+        "$RECORDED_AUDIO_PROFILE_MP3_TS" "$RECORDED_AUDIO_PROFILE_MP3_ENCODED"
+else
+    "$OPTIONAL_RECORDED_AUDIO_PROFILE_MIGRATION" "$RECORDED_AUDIO_PROFILE_MIGRATOR" "$USER_CFG" \
+        "$RECORDED_AUDIO_PROFILE_AWK" "$RECORDED_AUDIO_PROFILE_TS" "$RECORDED_AUDIO_PROFILE_ENCODED" \
+        "$RECORDED_AUDIO_PROFILE_MP3_TS" "$RECORDED_AUDIO_PROFILE_MP3_ENCODED"
 fi
 
 ln -sfn "$USER_CFG" "$APP_CFG"

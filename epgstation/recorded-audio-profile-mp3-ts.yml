@@ -1,0 +1,4 @@
+                - name: Home Assistant Audio MP3
+                  cmd: >-
+                      %FFMPEG% -dual_mono_mode main -i pipe:0 -vn -sn -map 0:a:0?
+                      -c:a libmp3lame -ar 48000 -ac 2 -b:a 192k -f mp3 pipe:1

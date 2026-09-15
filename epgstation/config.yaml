@@ -1,5 +1,5 @@
 name: EPGStation
-version: "0.1.8"
+version: "0.1.9"
 slug: epgstation
 description: "Mirakurun を使用した録画管理ソフト EPGStation。チューナーを持つ mirakc / Mirakurun が別に要ります。"
 url: https://github.com/Khronos31/hassio-addons/tree/main/epgstation

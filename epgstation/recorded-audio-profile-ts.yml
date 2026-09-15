@@ -1,0 +1,6 @@
+                - name: Home Assistant Audio
+                  cmd: >-
+                      %FFMPEG% -dual_mono_mode main -i pipe:0 -vn -sn -map 0:a:0?
+                      -c:a aac -profile:a aac_low -ar 48000 -ac 2 -b:a 128k
+                      -movflags +frag_keyframe+empty_moov+default_base_moof -frag_duration 1000000
+                      -y -f mp4 pipe:1
