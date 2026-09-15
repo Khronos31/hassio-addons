@@ -114,13 +114,13 @@ section != "" && /^            mp4:$/ {
 }
 target_section != "" && /^                - name:/ {
     finish_profile()
-    if ($0 ~ /^                - name:[[:space:]]*Home Assistant Audio MP3[[:space:]]*$/ ||
-        $0 ~ /^                - name:[[:space:]]*'Home Assistant Audio MP3'[[:space:]]*$/ ||
-        $0 ~ /^                - name:[[:space:]]*"Home Assistant Audio MP3"[[:space:]]*$/) {
+    if ($0 ~ /^                - name:[[:space:]]*Home Assistant Audio MP3([[:space:]]+#.*)?[[:space:]]*$/ ||
+        $0 ~ /^                - name:[[:space:]]*'Home Assistant Audio MP3'([[:space:]]+#.*)?[[:space:]]*$/ ||
+        $0 ~ /^                - name:[[:space:]]*"Home Assistant Audio MP3"([[:space:]]+#.*)?[[:space:]]*$/) {
         current_profile = "mp3"
-    } else if ($0 ~ /^                - name:[[:space:]]*Home Assistant Audio[[:space:]]*$/ ||
-        $0 ~ /^                - name:[[:space:]]*'Home Assistant Audio'[[:space:]]*$/ ||
-        $0 ~ /^                - name:[[:space:]]*"Home Assistant Audio"[[:space:]]*$/) {
+    } else if ($0 ~ /^                - name:[[:space:]]*Home Assistant Audio([[:space:]]+#.*)?[[:space:]]*$/ ||
+        $0 ~ /^                - name:[[:space:]]*'Home Assistant Audio'([[:space:]]+#.*)?[[:space:]]*$/ ||
+        $0 ~ /^                - name:[[:space:]]*"Home Assistant Audio"([[:space:]]+#.*)?[[:space:]]*$/) {
         current_profile = "aac"
     }
     if (current_profile != "") {

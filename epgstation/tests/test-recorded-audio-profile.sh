@@ -254,6 +254,88 @@ cmp "$TMP_DIR/quoted-encoded-duplicate.before" "$TMP_DIR/quoted-encoded-duplicat
 test ! -e "$TMP_DIR/quoted-encoded-duplicate.yml.pre-mp3-audio-profile.bak"
 grep -q 'duplicate Home Assistant Audio MP3' "$TMP_DIR/quoted-encoded-duplicate.err"
 
+cat > "$TMP_DIR/commented.yml" <<'YAML'
+stream:
+    recorded:
+        ts:
+            mp4:
+                - name: Home Assistant Audio # legacy AAC
+                  cmd: '%FFMPEG% -dual_mono_mode main -i pipe:0 -vn -sn -map 0:a:0? -c:a aac -profile:a aac_low -ar 48000 -ac 2 -b:a 128k -movflags +frag_keyframe+empty_moov+default_base_moof -frag_duration 1000000 -y -f mp4 pipe:1'
+                - name: "Home Assistant Audio MP3" # canonical MP3
+                  cmd: '%FFMPEG% -dual_mono_mode main -i pipe:0 -vn -sn -map 0:a:0? -c:a libmp3lame -ar 48000 -ac 2 -b:a 192k -f mp3 pipe:1'
+            hls: []
+        encoded:
+            mp4:
+                - name: 'Home Assistant Audio' # encoded AAC
+                  cmd: '%FFMPEG% -dual_mono_mode main -ss %SS% -i %INPUT% -vn -sn -map 0:a:0? -c:a aac -profile:a aac_low -ar 48000 -ac 2 -b:a 128k -movflags +frag_keyframe+empty_moov+default_base_moof -frag_duration 1000000 -y -f mp4 pipe:1'
+                - name: Home Assistant Audio MP3 # encoded MP3
+                  cmd: '%FFMPEG% -dual_mono_mode main -ss %SS% -i %INPUT% -vn -sn -map 0:a:0? -c:a libmp3lame -ar 48000 -ac 2 -b:a 192k -f mp3 pipe:1'
+YAML
+cp "$TMP_DIR/commented.yml" "$TMP_DIR/commented.before"
+"$MIGRATOR" "$TMP_DIR/commented.yml" "$AWK_SCRIPT" "$TS_PROFILE" "$ENCODED_PROFILE" \
+    "$MP3_TS_PROFILE" "$MP3_ENCODED_PROFILE" >/dev/null
+cmp "$TMP_DIR/commented.before" "$TMP_DIR/commented.yml"
+test ! -e "$TMP_DIR/commented.yml.pre-mp3-audio-profile.bak"
+assert_profiles "$TMP_DIR/commented.yml"
+
+cat > "$TMP_DIR/quoted-hash.yml" <<'YAML'
+stream:
+    recorded:
+        ts:
+            mp4:
+                - name: Home Assistant Audio
+                  cmd: >-
+                      %FFMPEG% -dual_mono_mode main -i pipe:0 -vn -sn -map 0:a:0?
+                      -c:a aac -profile:a aac_low -ar 48000 -ac 2 -b:a 128k
+                      -movflags +frag_keyframe+empty_moov+default_base_moof -frag_duration 1000000
+                      -y -f mp4 pipe:1
+                - name: "Home Assistant Audio MP3 # custom"
+                  cmd: '%FFMPEG% -i pipe:0 -f mp3 pipe:1'
+            hls: []
+        encoded:
+            mp4:
+                - name: Home Assistant Audio
+                  cmd: >-
+                      %FFMPEG% -dual_mono_mode main -ss %SS% -i %INPUT% -vn -sn -map 0:a:0?
+                      -c:a aac -profile:a aac_low -ar 48000 -ac 2 -b:a 128k
+                      -movflags +frag_keyframe+empty_moov+default_base_moof -frag_duration 1000000
+                      -y -f mp4 pipe:1
+                - name: Home Assistant Audio MP3
+                  cmd: >-
+                      %FFMPEG% -dual_mono_mode main -ss %SS% -i %INPUT% -vn -sn -map 0:a:0?
+                      -c:a libmp3lame -ar 48000 -ac 2 -b:a 192k -f mp3 pipe:1
+YAML
+cp "$TMP_DIR/quoted-hash.yml" "$TMP_DIR/quoted-hash.before"
+"$MIGRATOR" "$TMP_DIR/quoted-hash.yml" "$AWK_SCRIPT" "$TS_PROFILE" "$ENCODED_PROFILE" \
+    "$MP3_TS_PROFILE" "$MP3_ENCODED_PROFILE" >/dev/null
+yq e '.' "$TMP_DIR/quoted-hash.yml" >/dev/null
+test "$(yq e '.stream.recorded.ts.mp4 | map(select(.name == "Home Assistant Audio MP3")) | length' "$TMP_DIR/quoted-hash.yml")" = 1
+test "$(yq e '.stream.recorded.ts.mp4 | map(select(.name == "Home Assistant Audio MP3 # custom")) | length' "$TMP_DIR/quoted-hash.yml")" = 1
+cmp "$TMP_DIR/quoted-hash.before" "$TMP_DIR/quoted-hash.yml.pre-mp3-audio-profile.bak"
+if cmp -s "$TMP_DIR/quoted-hash.before" "$TMP_DIR/quoted-hash.yml"; then
+    echo "quoted hash scalar was incorrectly treated as the canonical profile" >&2
+    exit 1
+fi
+
+awk '
+    /^                - name: "Home Assistant Audio"$/ {
+        sub(/"Home Assistant Audio"/, "Home Assistant Audio")
+        print $0 "   "
+        next
+    }
+    /^                - name: '\''Home Assistant Audio MP3'\''$/ {
+        print $0 "  "
+        next
+    }
+    { print }
+' "$TMP_DIR/quoted.yml" > "$TMP_DIR/trailing-space.yml"
+cp "$TMP_DIR/trailing-space.yml" "$TMP_DIR/trailing-space.before"
+"$MIGRATOR" "$TMP_DIR/trailing-space.yml" "$AWK_SCRIPT" "$TS_PROFILE" "$ENCODED_PROFILE" \
+    "$MP3_TS_PROFILE" "$MP3_ENCODED_PROFILE" >/dev/null
+cmp "$TMP_DIR/trailing-space.before" "$TMP_DIR/trailing-space.yml"
+test ! -e "$TMP_DIR/trailing-space.yml.pre-mp3-audio-profile.bak"
+assert_profiles "$TMP_DIR/trailing-space.yml"
+
 cat > "$TMP_DIR/unknown.yml" <<'YAML'
 stream:
     recorded:
@@ -281,7 +363,7 @@ stream:
     recorded:
         ts:
             mp4:
-                - name: Home Assistant Audio MP3
+                - name: Home Assistant Audio MP3 # conflicting output options
                   cmd: >-
                       %FFMPEG% -dual_mono_mode main -i pipe:0 -vn -sn -map 0:a:0?
                       -c:a libmp3lame -ar 48000 -ac 2 -b:a 192k -f mp3 pipe:1 -c:a aac -f mp4
