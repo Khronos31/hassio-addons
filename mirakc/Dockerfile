@@ -17,8 +17,8 @@ COPY LICENCE.siano /usr/share/doc/isdbt_rio.LICENCE.siano
 RUN set -eux; \
     siano_tag_object='897c488c383cefbdb904b3742ed9cf6f7a96fcd2'; \
     siano_resolved_commit='533dd528f5ffb3c1d0f94e895a1f576f2b4127ee'; \
-    px4_tag_object='da2063971d1ed02d7bf7f7380de4cd3660b4fb1d'; \
-    px4_resolved_commit='08f10a2586e3570a00a4ec77ccec2447e38d3e28'; \
+    px4_tag_object='ef577464c64837bde3e0fb6159a4faa35c7c5008'; \
+    px4_resolved_commit='7ec828578db47db4ed2a1b247d4c24fb722aedde'; \
     fwtool_version='v0.2.1'; \
     fwtool_commit='2b3f79b5bc5db56e8556bb28397f7d8f74b2adeb'; \
     recisdb_deb='https://github.com/kazuki0824/recisdb-rs/releases/download/1.2.4/recisdb_1.2.4-1_amd64.deb'; \
