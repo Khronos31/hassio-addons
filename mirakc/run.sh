@@ -46,6 +46,7 @@ mirakc_pid=
 firmware_helper_pid=
 PX4_DEVICE=
 q3u4_enabled=0
+px4_model=q3u4
 q3_firmware_error=
 reader_tmp=
 shutdown_requested=0
@@ -200,8 +201,9 @@ detect_q3u4()
     fi
     case $base_serial in
         [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
         *)
-            echo "Q3U4 disabled: detector returned an invalid base serial: $base_serial" >&2
+            echo "PX4 disabled: detector returned an invalid device serial: $base_serial" >&2
             return 1
             ;;
     esac
@@ -445,7 +447,8 @@ generate_effective_config()
         --output "$APP_CFG" \
         --siano-list "$tmp_dir/siano-list.txt" \
         --warmup-file "$tmp_dir/siano-warmup.txt" \
-        --q3u4-enabled "$q3u4_enabled"; then
+        --q3u4-enabled "$q3u4_enabled" \
+        --px4-model "$px4_model"; then
         return 1
     fi
 }
@@ -516,7 +519,15 @@ if q3_base_serial=$(detect_q3u4); then
             echo "Q3U4 setup failed: reader config/IFD preparation is fatal" >&2
             exit 1
         fi
-        echo "Q3U4 enabled: device=$PX4_DEVICE firmware=$Q3U4_FIRMWARE" >&2
+        case $PX4_DEVICE in
+            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+                px4_model=mlt5
+                ;;
+            *)
+                px4_model=q3u4
+                ;;
+        esac
+        echo "PX4 enabled: model=$px4_model device=$PX4_DEVICE firmware=$Q3U4_FIRMWARE" >&2
         start_px4d
         if ! wait_px4_ready; then
             echo "px4d failed to start or become ready" >&2

@@ -110,6 +110,41 @@ tuners:
       - GR
     command: >-
       env PX4_RECEIVER=7 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT5 #0"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=mlt5 PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT5 #1"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=mlt5 PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT5 #2"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=mlt5 PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT5 #3"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=mlt5 PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT5 #4"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=mlt5 PX4_RECEIVER=4 /usr/local/bin/px4-ts-stream {{{channel}}}
 
 # チューナー出力は生TS。復号はジョブ（EPGスキャン）には掛けない。
 filters:

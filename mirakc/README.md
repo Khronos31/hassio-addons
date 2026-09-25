@@ -12,6 +12,7 @@ Home Assistant OS のカーネルドライバに依存せず、ユーザ空間�
 
 - PLEX PX-S1UD（USB ID `3275:0080`）1本以上。HA 機へ直結またはハブ
 - PLEX PX-Q3U4（USB ID `0511:084a` の2台1組、任意）
+- PLEX PX-MLT5PE（`0511:024e`）または e-Better DTV02A-5TS-P（`0511:924e`）1台。Q3U4 とは同時に使わない
 - 復号には B-CAS カードが必要です。PX-Q3U4 は本体カードスロットを利用でき、PX-S1UD のみなら外付け PC/SC リーダ（SCR3310 など）が必要です
 
 録画の予約と保存は [EPGStation アドオン](../epgstation) が担当します。

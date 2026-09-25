@@ -40,6 +40,7 @@ def parse_args():
     parser.add_argument("--siano-list", required=True, type=Path)
     parser.add_argument("--warmup-file", required=True, type=Path)
     parser.add_argument("--q3u4-enabled", choices=("0", "1"), required=True)
+    parser.add_argument("--px4-model", choices=("q3u4", "mlt5"), default="q3u4")
     parser.add_argument("--siano-wrapper", default=SIANO_WRAPPER)
     parser.add_argument("--q3u4-wrapper", default=Q3U4_WRAPPER)
     return parser.parse_args()
@@ -167,7 +168,16 @@ def managed_index(tokens, assignment, assignment_prefix, description, upper_boun
     return index
 
 
-def filter_tuners(tuners, adapters, q3u4_enabled, siano_wrapper, q3u4_wrapper):
+def px4_profile(tokens, description):
+    values = [token for token in tokens if token.startswith("PX4_PROFILE=")]
+    if not values:
+        return "q3u4"
+    if len(values) != 1 or values[0] not in ("PX4_PROFILE=q3u4", "PX4_PROFILE=mlt5"):
+        raise ConfigError(f"managed tuner command has an invalid PX4 profile ({description})")
+    return values[0].split("=", 1)[1]
+
+
+def filter_tuners(tuners, adapters, q3u4_enabled, px4_model, siano_wrapper, q3u4_wrapper):
     retained = []
     retained_siano = []
     retained_q3u4 = []
@@ -195,14 +205,15 @@ def filter_tuners(tuners, adapters, q3u4_enabled, siano_wrapper, q3u4_wrapper):
                 removed_siano += 1
             continue
         if q3u4_tokens is not None:
+            profile = px4_profile(q3u4_tokens, description)
             receiver = managed_index(
                 q3u4_tokens,
                 Q3U4_ASSIGNMENT,
                 Q3U4_ASSIGNMENT_PREFIX,
                 description,
-                upper_bound=7,
+                upper_bound=4 if profile == "mlt5" else 7,
             )
-            if q3u4_enabled:
+            if q3u4_enabled and profile == px4_model:
                 retained.append(tuner)
                 retained_q3u4.append(receiver)
             else:
@@ -293,6 +304,7 @@ def main():
         tuners,
         adapters,
         args.q3u4_enabled == "1",
+        args.px4_model,
         args.siano_wrapper,
         args.q3u4_wrapper,
     )

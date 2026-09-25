@@ -593,6 +593,7 @@ run_effective_config_failure_case no_effective_tuners 'server: {}'
 
 template=$addon_dir/config.yml.template
 assert_equal 8 "$(grep -c 'name: \"PX-Q3U4 #' "$template")" 'Q3U4 tuner count'
+assert_equal 5 "$(grep -c 'name: \"PX-MLT5 #' "$template")" 'MLT5 tuner count'
 assert_equal 2 "$(grep -c 'name: \"PX-S1UD #' "$template")" 'Siano tuner count'
 assert_contains 'channel: BS15_0' "$template" 'BS satellite channel'
 assert_contains 'channel: CS8' "$template" 'CS satellite channel'

@@ -114,12 +114,14 @@ run_helper()
     warmup=$4
     q3u4=$5
     log=$6
+    model=${7:-q3u4}
     if ! python3 "$helper" \
         --input "$input" \
         --output "$output" \
         --siano-list "$list" \
         --warmup-file "$warmup" \
         --q3u4-enabled "$q3u4" \
+        --px4-model "$model" \
         >"$log.stdout" 2>"$log.stderr"; then
         return 1
     fi
@@ -176,6 +178,12 @@ EOF
 run_helper "$base" "$q3_one" "$q3_one_list" "$tmp_dir/q3-one.warmup" 1 "$tmp_dir/q3-one.log" || \
     fail 'Q3U4 plus one Siano generation failed'
 assert_tuners "$q3_one" 1 8 1 'Q3U4 plus one Siano tuner counts'
+
+mlt_one=$tmp_dir/mlt-one.yml
+run_helper "$base" "$mlt_one" "$q3_zero_list" "$tmp_dir/mlt-one.warmup" 1 "$tmp_dir/mlt-one.log" mlt5 || \
+    fail 'MLT5 plus zero Siano generation failed'
+assert_tuners "$mlt_one" 0 5 1 'MLT5 plus zero Siano tuner counts'
+assert_channels "$mlt_one" 11 1 1 'MLT5 plus zero Siano channel counts'
 assert_channels "$q3_one" 11 1 1 'Q3U4 plus one Siano channel counts'
 actual_warmup=$(cat "$tmp_dir/q3-one.warmup")
 [ "$actual_warmup" = 0 ] || fail 'only retained Siano adapter 0 was not selected for warmup'

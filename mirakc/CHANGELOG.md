@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3
+
+- PX-MLT5PE（`0511:024e`）と DTV02A-5TS-P（`0511:924e`）を 1 台として検出する。識別子は 15 桁の USB serial
+- 新しい `config.yml` には受信機 0–4 の兼用チューナーを入れる。既存の `config.yml` は書き換えない
+- Q3U4 と MLT5 系が同時に見えるときは、どちらも起動しない
+
 ## 0.2.2
 
 - 同梱の px4-userland を v0.1.4（`7ec828578db47db4ed2a1b247d4c24fb722aedde`）へ更新

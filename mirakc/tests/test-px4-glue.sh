@@ -184,6 +184,29 @@ usb_device 9-3 0511 084a 000012050009701
 usb_device 9-4 0511 084a 000012050009702
 expect_detector_failure "two complete serial pairs"
 
+reset_sysfs
+usb_device m-1 0511 024e 000012050009603
+expect_detector_success 000012050009603 "single PX-MLT5PE"
+
+reset_sysfs
+usb_device m-2 0511 924e 000012050009604
+expect_detector_success 000012050009604 "single DTV02A-5TS-P"
+
+reset_sysfs
+usb_device m-3 0511 024e 000012050009603
+usb_device m-4 0511 924e 000012050009604
+expect_detector_failure "two MLT5 devices"
+
+reset_sysfs
+usb_device m-5 0511 024e 000012050009603
+usb_device m-6 0511 084a 000012050009601
+usb_device m-7 0511 084a 000012050009602
+expect_detector_failure "Q3U4 pair plus MLT5"
+
+reset_sysfs
+usb_device m-8 0511 024e 00001205000960
+expect_detector_failure "MLT5 serial is not 15 digits"
+
 stub=$tmp_dir/px4-ts-stub
 argv_log=$tmp_dir/argv.log
 cat > "$stub" <<'EOF'
@@ -291,6 +314,16 @@ if env PX4_DEVICE=00001205000960 PX4_RECEIVER=08 PX4_TS_BIN="$stub" ARGV_LOG="$a
     fail "leading-zero receiver: wrapper unexpectedly succeeded"
 fi
 assert_nonempty_file "$tmp_dir/wrapper.err" "leading-zero receiver"
+if ! env PX4_DEVICE=000012050009603 PX4_RECEIVER=2 PX4_TS_BIN="$stub" ARGV_LOG="$argv_log" "$wrapper" T13 >"$tmp_dir/wrapper.out" 2>"$tmp_dir/wrapper.err"; then
+    fail "MLT5 terrestrial receiver 2 unexpectedly failed"
+fi
+if ! env PX4_DEVICE=000012050009603 PX4_RECEIVER=2 PX4_TS_BIN="$stub" ARGV_LOG="$argv_log" "$wrapper" BS15_0 >"$tmp_dir/wrapper.out" 2>"$tmp_dir/wrapper.err"; then
+    fail "MLT5 satellite receiver 2 unexpectedly failed"
+fi
+if env PX4_DEVICE=000012050009603 PX4_RECEIVER=5 PX4_TS_BIN="$stub" ARGV_LOG="$argv_log" "$wrapper" T13 >"$tmp_dir/wrapper.out" 2>"$tmp_dir/wrapper.err"; then
+    fail "MLT5 receiver 5 unexpectedly succeeded"
+fi
+assert_nonempty_file "$tmp_dir/wrapper.err" "MLT5 receiver 5"
 if env PX4_DEVICE=00001205000960 PX4_RECEIVER=8 PX4_TS_BIN="$stub" ARGV_LOG="$argv_log" "$wrapper" T13 >"$tmp_dir/wrapper.out" 2>"$tmp_dir/wrapper.err"; then
     fail "out-of-range receiver: wrapper unexpectedly succeeded"
 fi
