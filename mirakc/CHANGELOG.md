@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4
+
+- 同梱の siano-userland を v0.1.6（`ad9bc7361288e9c188a1d8235ab946ac8b7bd6ac`）へ更新
+- 同梱の px4-userland を v0.1.6（`3477301c09578d6c0d85f381c1448a5c53157a68`）へ更新
+
 ## 0.2.3
 
 - PX-MLT5PE（`0511:024e`）と DTV02A-5TS-P（`0511:924e`）を 1 台として検出する。識別子は 15 桁の USB serial

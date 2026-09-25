@@ -64,10 +64,10 @@ RUN apt-get update \
 COPY tuner/ /tmp/tuner/
 
 RUN set -eux; \
-    siano_tag_object='897c488c383cefbdb904b3742ed9cf6f7a96fcd2'; \
-    siano_resolved_commit='533dd528f5ffb3c1d0f94e895a1f576f2b4127ee'; \
-    px4_tag_object='ef577464c64837bde3e0fb6159a4faa35c7c5008'; \
-    px4_resolved_commit='7ec828578db47db4ed2a1b247d4c24fb722aedde'; \
+    siano_tag_object='5e584d18f95884362b4df6cf02c8215fb02b551b'; \
+    siano_resolved_commit='ad9bc7361288e9c188a1d8235ab946ac8b7bd6ac'; \
+    px4_tag_object='0c72e5281252b412879c527f637b9da39cb85f58'; \
+    px4_resolved_commit='3477301c09578d6c0d85f381c1448a5c53157a68'; \
     recisdb_deb='https://github.com/kazuki0824/recisdb-rs/releases/download/1.2.4/recisdb_1.2.4-1_amd64.deb'; \
     recisdb_sha256='0ec83fc5d3779d95156265bda1af6ef0ca7d5b7db37e59dfa8bb17ced6a36f2a'; \
     siano_firmware_url='https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/isdbt_rio.inp?id=e981caea6ed33c48d25b7dbf473327dbd01df163'; \
