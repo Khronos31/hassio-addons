@@ -1,0 +1,159 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+set -eu
+
+LC_ALL=C
+export LC_ALL
+
+if [ "$#" -ne 1 ]; then
+    echo "Usage: px4-ts-stream CHANNEL" >&2
+    exit 2
+fi
+
+channel=$1
+
+if [ -z "${PX4_DEVICE+x}" ] || [ -z "$PX4_DEVICE" ]; then
+    echo "PX4_DEVICE is required" >&2
+    exit 2
+fi
+device_model=
+case $PX4_DEVICE in
+    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+        device_model=q3u4
+        ;;
+    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+        device_model=mlt5
+        ;;
+    *)
+        echo "Invalid PX4_DEVICE (expected 14 Q3U4 digits or 15 MLT5 digits): $PX4_DEVICE" >&2
+        exit 2
+        ;;
+esac
+
+if [ -z "${PX4_RECEIVER+x}" ] || [ -z "$PX4_RECEIVER" ]; then
+    echo "PX4_RECEIVER is required" >&2
+    exit 2
+fi
+case $device_model in
+    q3u4)
+        case $PX4_RECEIVER in
+            0|1|2|3|4|5|6|7) ;;
+            *)
+                echo "Invalid PX4_RECEIVER (expected 0..7): $PX4_RECEIVER" >&2
+                exit 2
+                ;;
+        esac
+        ;;
+    mlt5)
+        case $PX4_RECEIVER in
+            0|1|2|3|4) ;;
+            *)
+                echo "Invalid PX4_RECEIVER (expected 0..4): $PX4_RECEIVER" >&2
+                exit 2
+                ;;
+        esac
+        ;;
+esac
+
+runtime_dir=${PX4_RUNTIME_DIR:-/run/px4-userland}
+if [ -z "$runtime_dir" ]; then
+    echo "PX4_RUNTIME_DIR must not be empty" >&2
+    exit 2
+fi
+px4_ts_bin=${PX4_TS_BIN:-/usr/local/bin/px4-ts}
+if [ -z "$px4_ts_bin" ]; then
+    echo "PX4_TS_BIN must not be empty" >&2
+    exit 2
+fi
+
+system=
+frequency_khz=
+slot=
+
+case $channel in
+    T1[3-9]|T[2-5][0-9]|T6[0-2])
+        physical_channel=${channel#T}
+        case $device_model:$PX4_RECEIVER in
+            q3u4:2|q3u4:3|q3u4:6|q3u4:7|mlt5:0|mlt5:1|mlt5:2|mlt5:3|mlt5:4) ;;
+            *)
+                echo "Receiver $PX4_RECEIVER cannot receive terrestrial channel: $channel" >&2
+                exit 2
+                ;;
+        esac
+        system=isdb-t
+        frequency_khz=$((395142 + physical_channel * 6000))
+        ;;
+    BS[0-9][0-9]_[0-9]|BS[0-9][0-9]_1[01])
+        transponder=${channel#BS}
+        number=${transponder%_*}
+        slot=${transponder#*_}
+        case $number in
+            01|03|05|07|09|11|13|15|17|19|21|23) ;;
+            *)
+                echo "Invalid BS transponder: $channel" >&2
+                exit 2
+                ;;
+        esac
+        case $slot in
+            0|1|2|3|4|5|6|7|8|9|10|11) ;;
+            *)
+                echo "Invalid BS slot: $channel" >&2
+                exit 2
+                ;;
+        esac
+        case $device_model:$PX4_RECEIVER in
+            q3u4:0|q3u4:1|q3u4:4|q3u4:5|mlt5:0|mlt5:1|mlt5:2|mlt5:3|mlt5:4) ;;
+            *)
+                echo "Receiver $PX4_RECEIVER cannot receive satellite channel: $channel" >&2
+                exit 2
+                ;;
+        esac
+        number_value=${number#0}
+        system=isdb-s
+        frequency_khz=$((1049480 + ((number_value - 1) / 2) * 38360))
+        ;;
+    CS[0-9]|CS1[0-9]|CS2[0-4])
+        number=${channel#CS}
+        case $number in
+            2|4|6|8|10|12|14|16|18|20|22|24) ;;
+            *)
+                echo "Invalid CS transponder: $channel" >&2
+                exit 2
+                ;;
+        esac
+        case $device_model:$PX4_RECEIVER in
+            q3u4:0|q3u4:1|q3u4:4|q3u4:5|mlt5:0|mlt5:1|mlt5:2|mlt5:3|mlt5:4) ;;
+            *)
+                echo "Receiver $PX4_RECEIVER cannot receive satellite channel: $channel" >&2
+                exit 2
+                ;;
+        esac
+        system=isdb-s
+        frequency_khz=$((1613000 + ((number - 2) / 2) * 40000))
+        slot=0
+        ;;
+    *)
+        echo "Unsupported mirakc channel: $channel" >&2
+        exit 2
+        ;;
+esac
+
+if [ "$system" = isdb-t ]; then
+    exec "$px4_ts_bin" \
+        --device "$PX4_DEVICE" \
+        --receiver "$PX4_RECEIVER" \
+        --system "$system" \
+        --frequency-khz "$frequency_khz" \
+        --runtime-dir "$runtime_dir" \
+        --output -
+fi
+
+exec "$px4_ts_bin" \
+    --device "$PX4_DEVICE" \
+    --receiver "$PX4_RECEIVER" \
+    --system "$system" \
+    --frequency-khz "$frequency_khz" \
+    --slot "$slot" \
+    --lnb-voltage 0 \
+    --runtime-dir "$runtime_dir" \
+    --output -

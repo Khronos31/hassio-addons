@@ -1,0 +1,25 @@
+name: KonomiTV
+version: "0.1.0"
+slug: konomitv
+description: "KonomiTV 0.14.1。番組表・予約・放送波は EDCB。録画先は /media 以下を設定ファイルで指定する。"
+url: https://github.com/Khronos31/hassio-addons/tree/main/konomitv
+arch:
+  - amd64
+init: false
+startup: application
+boot: manual
+timeout: 120
+map:
+  - type: addon_config
+    read_only: false
+  - type: media
+    read_only: false
+  # EDCB の設定フォルダにある SrvPipe の FIFO を読む。
+  - type: all_addon_configs
+    read_only: true
+# 画面は Ingress だけ。7000 番はコンテナの中で待ち受けるが、ホストには出さない。
+ingress: true
+ingress_port: 7011
+panel_icon: mdi:television
+panel_title: KonomiTV
+# 設定は config.yaml。schema には収まらない。

@@ -1,0 +1,37 @@
+name: EDCB
+version: "0.1.0"
+slug: edcb
+description: "xtne6f 版 EDCB。siano-userland と px4-userland を同梱し、PX-S1UD は BonDriver_S1UD で開く。"
+url: https://github.com/Khronos31/hassio-addons/tree/main/edcb
+arch:
+  - amd64
+usb: true
+udev: true
+init: false
+startup: application
+boot: manual
+timeout: 60
+map:
+  - type: addon_config
+    read_only: false
+  - type: media
+    read_only: false
+# ⚠️ LAN へ無認証で開く。EDCB の HTTP にログイン機構は無い。
+#    要らなければ構成タブで空欄にすれば閉じられる。
+ports:
+  5510/tcp: 5510
+ports_description:
+  5510/tcp: "EDCB の Web UI（認証なし）"
+ingress: true
+ingress_port: 5510
+panel_icon: mdi:television-guide
+panel_title: EDCB
+options:
+  # 空なら BonDriver_LinuxMirakc は使わない。使うときだけ
+  # http://<リポジトリID>-mirakc:40772 のように書く。
+  mirakc_url: ""
+  decode: true
+schema:
+  mirakc_url: str
+  decode: bool
+watchdog: http://[HOST]:[PORT:5510]/

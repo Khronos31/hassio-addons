@@ -1,0 +1,34 @@
+general:
+  backend: EDCB
+  # 番組表・予約・放送波は EDCB。@EDCB_HOST@ は初回起動時に、
+  # このアドオンのホスト名から兄弟の EDCB アドオンへ置き換わる。
+  # 例: local-konomitv なら local-edcb、<リポジトリID>-konomitv なら <リポジトリID>-edcb。
+  always_receive_tv_from_mirakurun: false
+  edcb_url: tcp://@EDCB_HOST@:4510/
+  # 放送波を mirakc から受けるときだけ、次を有効にして URL を書く。
+  # always_receive_tv_from_mirakurun: true
+  # mirakurun_url: http://<リポジトリID>-mirakc:40772/
+  encoder: FFmpeg
+  program_update_interval: 5.0
+  debug: false
+  debug_encoder: false
+
+server:
+  port: 7000
+  custom_https_certificate: null
+  custom_https_private_key: null
+
+tv:
+  preferred_terrestrial_region: null
+  max_alive_time: 10
+  debug_mode_ts_path: null
+
+video:
+  # ディレクトリ名はここを書き換える。/media は読み書きでマウントしてある。
+  recorded_folders:
+    - /media/EDCB
+  exclude_scan_paths: []
+
+capture:
+  upload_folders:
+    - /media/KonomiTV-Capture

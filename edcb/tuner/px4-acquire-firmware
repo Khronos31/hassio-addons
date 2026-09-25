@@ -1,0 +1,256 @@
+#!/bin/sh
+# Download the vendor driver package and derive the PX-Q3U4 firmware cache.
+# The vendor archive, SYS file, and generated candidate are temporary only.
+set -eu
+
+LC_ALL=C
+export LC_ALL
+CDPATH=
+export CDPATH
+
+TARGET=${PX4_FW_TARGET:-/config/it930x-firmware.bin}
+MANIFEST=${PX4_FW_SOURCE_MANIFEST:-/usr/share/mirakc-addon/px4-firmware-source.tsv}
+FWTOOL_DIR=${PX4_FWTOOL_DIR:-/usr/libexec/mirakc-addon/px4-fwtool}
+CURL_BIN=${PX4_FW_CURL_BIN:-curl}
+PYTHON_BIN=${PX4_FW_PYTHON_BIN:-python3}
+CONNECT_TIMEOUT=${PX4_FW_CONNECT_TIMEOUT_SECONDS:-10}
+TOTAL_TIMEOUT=${PX4_FW_TOTAL_TIMEOUT_SECONDS:-60}
+
+archive_tmp=
+sys_tmp=
+candidate_tmp=
+child_pid=
+
+cleanup()
+{
+    [ -z "$archive_tmp" ] || rm -f "$archive_tmp" || :
+    [ -z "$sys_tmp" ] || rm -f "$sys_tmp" || :
+    [ -z "$candidate_tmp" ] || rm -f "$candidate_tmp" || :
+}
+
+forward_signal()
+{
+    signal=$1
+    if [ -n "$child_pid" ]; then
+        kill -"$signal" "$child_pid" 2>/dev/null || :
+    fi
+}
+
+on_signal()
+{
+    signal=$1
+    forward_signal "$signal"
+    if [ -n "$child_pid" ]; then
+        wait "$child_pid" 2>/dev/null || :
+        child_pid=
+    fi
+    cleanup
+    trap - EXIT HUP INT TERM
+    case $signal in
+        HUP) exit 129 ;;
+        INT) exit 130 ;;
+        TERM) exit 143 ;;
+    esac
+}
+
+trap cleanup EXIT
+trap 'on_signal HUP' HUP
+trap 'on_signal INT' INT
+trap 'on_signal TERM' TERM
+
+fail()
+{
+    echo "PX-Q3U4 firmware acquisition failed: $*" >&2
+    exit 1
+}
+
+is_uint()
+{
+    case $1 in
+        ''|*[!0-9]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+is_sha256()
+{
+    value=$1
+    case $value in
+        *[!0-9a-f]*|'') return 1 ;;
+    esac
+    [ "${#value}" -eq 64 ]
+}
+
+verify_file()
+{
+    file=$1
+    expected_size=$2
+    expected_hash=$3
+
+    [ -f "$file" ] && [ ! -L "$file" ] && [ -r "$file" ] || return 1
+    actual_size=$(wc -c < "$file" | awk '{print $1}') || return 1
+    [ "$actual_size" = "$expected_size" ] || return 1
+    actual_hash=$(sha256sum "$file" 2>/dev/null | awk '{print $1}') || return 1
+    [ "$actual_hash" = "$expected_hash" ]
+}
+
+validate_manifest()
+{
+    [ -f "$MANIFEST" ] && [ ! -L "$MANIFEST" ] && [ -r "$MANIFEST" ] || \
+        fail "manifest is missing, unreadable, or not a regular file: $MANIFEST"
+
+    awk -F '\t' '
+        BEGIN {
+            required["manifest_version"] = 1
+            required["archive_url"] = 1
+            required["archive_size"] = 1
+            required["archive_sha256"] = 1
+            required["sys_entry"] = 1
+            required["sys_size"] = 1
+            required["sys_sha256"] = 1
+            required["output_filename"] = 1
+            required["output_size"] = 1
+            required["output_sha256"] = 1
+        }
+        NF != 2 || $1 == "" || $2 == "" || !($1 in required) || seen[$1]++ {
+            invalid = 1
+        }
+        END {
+            for (key in required) {
+                if (seen[key] != 1) invalid = 1
+            }
+            exit invalid ? 1 : 0
+        }
+    ' "$MANIFEST" || fail "manifest has malformed, unknown, duplicate, or missing keys: $MANIFEST"
+}
+
+manifest_value()
+{
+    wanted=$1
+    awk -F '\t' -v wanted="$wanted" '$1 == wanted { print $2 }' "$MANIFEST"
+}
+
+run_child()
+{
+    "$@" &
+    child_pid=$!
+    child_status=0
+    wait "$child_pid" || child_status=$?
+    child_pid=
+    return "$child_status"
+}
+
+validate_manifest
+manifest_version=$(manifest_value manifest_version)
+archive_url=$(manifest_value archive_url)
+archive_size=$(manifest_value archive_size)
+archive_sha256=$(manifest_value archive_sha256)
+sys_entry=$(manifest_value sys_entry)
+sys_size=$(manifest_value sys_size)
+sys_sha256=$(manifest_value sys_sha256)
+output_filename=$(manifest_value output_filename)
+output_size=$(manifest_value output_size)
+output_sha256=$(manifest_value output_sha256)
+
+[ "$manifest_version" = 1 ] || fail "unsupported manifest version: $manifest_version"
+case $archive_url in
+    https://*) ;;
+    *) fail "archive URL must use HTTPS" ;;
+esac
+is_uint "$archive_size" || fail "archive_size is not an unsigned integer"
+is_uint "$sys_size" || fail "sys_size is not an unsigned integer"
+is_uint "$output_size" || fail "output_size is not an unsigned integer"
+is_sha256 "$archive_sha256" || fail "archive_sha256 is malformed"
+is_sha256 "$sys_sha256" || fail "sys_sha256 is malformed"
+is_sha256 "$output_sha256" || fail "output_sha256 is malformed"
+case $output_filename in
+    ''|.|..|*/*) fail "output_filename is not a basename" ;;
+esac
+[ "${TARGET##*/}" = "$output_filename" ] || \
+    fail "target basename does not match manifest output_filename"
+case $sys_entry in
+    ''|/*) fail "sys_entry must be a non-empty relative ZIP entry" ;;
+esac
+
+if [ -L "$TARGET" ]; then
+    fail "target cache is a symlink: $TARGET"
+fi
+if [ -e "$TARGET" ] && [ ! -f "$TARGET" ]; then
+    fail "target cache is not a regular file: $TARGET"
+fi
+if verify_file "$TARGET" "$output_size" "$output_sha256"; then
+    echo "PX-Q3U4 firmware cache verified: $TARGET" >&2
+    exit 0
+fi
+
+case $CONNECT_TIMEOUT in ''|*[!0-9]*) fail "connect timeout is not a positive integer" ;; esac
+case $TOTAL_TIMEOUT in ''|*[!0-9]*) fail "total timeout is not a positive integer" ;; esac
+[ "$CONNECT_TIMEOUT" -gt 0 ] || fail "connect timeout must be greater than zero"
+[ "$TOTAL_TIMEOUT" -gt 0 ] || fail "total timeout must be greater than zero"
+
+target_dir=$(dirname "$TARGET") || fail "could not determine target directory"
+[ -d "$target_dir" ] || fail "target directory does not exist: $target_dir"
+[ -x "$FWTOOL_DIR/fwtool" ] && [ -f "$FWTOOL_DIR/fwtool" ] && \
+    [ -r "$FWTOOL_DIR/fwinfo.tsv" ] && [ -f "$FWTOOL_DIR/fwinfo.tsv" ] || \
+    fail "pinned fwtool or fwinfo.tsv is unavailable: $FWTOOL_DIR"
+
+archive_tmp=$(mktemp "$target_dir/.px4-firmware.archive.XXXXXX") || \
+    fail "could not create archive temporary file"
+sys_tmp=$(mktemp "$target_dir/.px4-firmware.sys.XXXXXX") || \
+    fail "could not create SYS temporary file"
+candidate_tmp=$(mktemp "$target_dir/.px4-firmware.candidate.XXXXXX") || \
+    fail "could not create firmware candidate"
+
+if ! run_child "$CURL_BIN" -fL --proto '=https' --tlsv1.2 \
+    --connect-timeout "$CONNECT_TIMEOUT" --max-time "$TOTAL_TIMEOUT" \
+    --retry 0 --output "$archive_tmp" "$archive_url"; then
+    fail "download failed"
+fi
+verify_file "$archive_tmp" "$archive_size" "$archive_sha256" || \
+    fail "downloaded archive failed size or SHA-256 verification"
+
+extract_code='import sys, zipfile
+archive, entry, expected_size = sys.argv[1], sys.argv[2], int(sys.argv[3])
+with zipfile.ZipFile(archive) as source:
+    matches = [info for info in source.infolist() if info.filename == entry]
+    if len(matches) != 1 or matches[0].is_dir() or matches[0].file_size != expected_size:
+        raise SystemExit("exact SYS entry missing, duplicate, directory, or wrong size")
+    with source.open(matches[0], "r") as payload:
+        remaining = expected_size
+        while remaining:
+            chunk = payload.read(min(65536, remaining))
+            if not chunk:
+                raise SystemExit("SYS entry ended early")
+            sys.stdout.buffer.write(chunk)
+            remaining -= len(chunk)
+        if payload.read(1):
+            raise SystemExit("SYS entry exceeds declared size")'
+if ! run_child "$PYTHON_BIN" -c "$extract_code" "$archive_tmp" "$sys_entry" "$sys_size" \
+    > "$sys_tmp"; then
+    fail "exact SYS entry extraction failed"
+fi
+verify_file "$sys_tmp" "$sys_size" "$sys_sha256" || \
+    fail "extracted SYS failed size or SHA-256 verification"
+
+# The positional parameters are intentionally expanded by the child shell.
+# shellcheck disable=SC2016
+if ! run_child sh -c 'cd "$1" && exec ./fwtool "$2" "$3"' \
+    sh "$FWTOOL_DIR" "$sys_tmp" "$candidate_tmp"; then
+    fail "fwtool failed"
+fi
+verify_file "$candidate_tmp" "$output_size" "$output_sha256" || \
+    fail "generated firmware failed basename, size, or SHA-256 verification"
+chmod 0644 "$candidate_tmp" || fail "could not set firmware mode"
+
+# Re-check the destination immediately before the only operation which can
+# replace it.  A concurrent successful installer wins without being replaced.
+if [ -L "$TARGET" ] || { [ -e "$TARGET" ] && [ ! -f "$TARGET" ]; }; then
+    fail "target cache changed to a symlink or non-regular file"
+fi
+if verify_file "$TARGET" "$output_size" "$output_sha256"; then
+    echo "PX-Q3U4 firmware cache was installed concurrently: $TARGET" >&2
+    exit 0
+fi
+mv -f "$candidate_tmp" "$TARGET" || fail "atomic firmware install failed"
+candidate_tmp=
+echo "PX-Q3U4 firmware acquired and verified: $TARGET" >&2
