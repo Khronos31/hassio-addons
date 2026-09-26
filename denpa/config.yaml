@@ -1,0 +1,27 @@
+name: denpa
+version: "0.1.0"
+slug: denpa
+description: "danything/denpa 1.22.1。PX-Q3U4 は同梱の px4-userland で開く。EDCB や mirakc と同時に USB は開かない。"
+url: https://github.com/danything/denpa
+arch:
+  - amd64
+usb: true
+udev: true
+init: false
+# px4-ts の読み口を 8MB まで広げる。無いと 64KB のまま詰まり、ライブが SLOW_CONSUMER で切れる。
+privileged:
+  - SYS_RESOURCE
+startup: application
+boot: manual
+timeout: 60
+map:
+  - type: addon_config
+    read_only: false
+  - type: media
+    read_only: false
+# 画面は Ingress だけ。3000 はホストで既に使われている。
+# 3001 は denpa 本体が内側のサーバに使うので、中継は 3002。
+ingress: true
+ingress_port: 3002
+panel_icon: mdi:television-classic
+panel_title: denpa
