@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- PX-Q3U4 / PX-MLT5PE 系を直接開く BonDriver_Px4_T / _S を追加
+- 起動時に px4 機材を検出して px4d を起動し、EpgTimerSrv.ini の本数を自動設定
+- チャンネルスキャンは px4 検出時に BonDriver_Px4_T を使うように変更
+
 ## 0.1.1
 
 - 同梱の siano-userland を v0.1.6 へ更新

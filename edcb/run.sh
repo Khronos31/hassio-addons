@@ -70,7 +70,7 @@ if [ -x /usr/sbin/pcscd ]; then
     /usr/sbin/pcscd --foreground >> "$CFG/pcscd.log" 2>&1 &
 fi
 
-mkdir -p "$CFG" /media/EDCB "$LIB" /run/edcb-s1ud
+mkdir -p "$CFG" /media/EDCB "$LIB" /run/edcb-s1ud /run/edcb-px4 /run/px4-userland
 if [ ! -f "$CFG/EpgTimerSrv.ini" ]; then
     echo "設定が無いので初期ファイルを置きます: ${CFG}"
     cp -a "$SEED"/. "$CFG"/
@@ -93,6 +93,19 @@ Count=0
 GetEpg=1
 EPGCount=1
 Priority=0
+
+; px4-userland の機材 (PX-Q3U4 / PX-MLT5PE 系)。本数は起動時に自動で書き直す。
+[BonDriver_Px4_T.so]
+Count=0
+GetEpg=1
+EPGCount=1
+Priority=4
+
+[BonDriver_Px4_S.so]
+Count=0
+GetEpg=1
+EPGCount=1
+Priority=5
 
 [BonDriver_LinuxMirakc_T.so]
 Count=0
@@ -156,6 +169,53 @@ if [ -n "$host_ip" ]; then
     write_bon_ini "$LIB/BonDriver_LinuxMirakc_T.so.ini"
     write_bon_ini "$LIB/BonDriver_LinuxMirakc_S.so.ini"
 fi
+
+# EpgTimerSrv.ini の [section] の Count を書き換える。無ければ末尾に足す。
+set_bondriver_count() {
+    section=$1
+    count=$2
+    priority=$3
+    ini="$CFG/EpgTimerSrv.ini"
+    awk -v section="$section" -v count="$count" -v priority="$priority" '
+        index($0, "[" section "]") == 1 { in_sec = 1; found = 1; print; next }
+        in_sec && /^\[/ { in_sec = 0 }
+        in_sec && /^Count=/ { print "Count=" count; next }
+        { print }
+        END {
+            if (!found) {
+                printf "\n[%s]\nCount=%d\nGetEpg=1\nEPGCount=1\nPriority=%d\n", section, count, priority
+            }
+        }
+    ' "$ini" > "$ini.tmp" && mv "$ini.tmp" "$ini"
+}
+
+# PX-Q3U4 / PX-MLT5PE 系 (px4-userland) が刺さっていれば px4d を起こし、
+# BonDriver_Px4_T/S の本数を書き直す。受信機の取り合いは BonDriver 側の
+# flock で解決するので、Count は受信機の本数でよい。
+PX4_DEVICE=
+PX4_FIRMWARE=/lib/firmware/it930x-firmware.bin
+PX4_RUNTIME_DIR=/run/px4-userland
+if [ -x /usr/local/bin/px4-detect-q3u4 ] && [ -x /usr/local/bin/px4d ] && [ -r "$PX4_FIRMWARE" ]; then
+    if PX4_DEVICE=$(/usr/local/bin/px4-detect-q3u4 2>/dev/null); then
+        case "$PX4_DEVICE" in
+            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+                T_COUNT=4; S_COUNT=4 ;;  # Q3U4: 地上波 4 / BS・CS 4
+            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+                T_COUNT=5; S_COUNT=5 ;;  # MLT5 系: 5 受信機が地上波/衛星を兼ねる
+            *)
+                echo "px4 の検出結果が読めません: ${PX4_DEVICE}" >&2
+                PX4_DEVICE=
+                ;;
+        esac
+        if [ -n "$PX4_DEVICE" ]; then
+            echo "px4 を検出しました: ${PX4_DEVICE} (T=${T_COUNT}, S=${S_COUNT})。px4d を起動します。"
+            /usr/local/bin/px4d --device "$PX4_DEVICE" --firmware "$PX4_FIRMWARE" --runtime-dir "$PX4_RUNTIME_DIR" &
+            set_bondriver_count "BonDriver_Px4_T.so" "$T_COUNT" 4
+            set_bondriver_count "BonDriver_Px4_S.so" "$S_COUNT" 5
+        fi
+    fi
+fi
+export PX4_DEVICE PX4_RUNTIME_DIR
 
 # チャンネル一覧が無いと Web UI の EPG取得は「開始できませんでした」になる。
 # 地上波用 BonDriver で一度だけスキャンし、結果は Setting/ に残る。

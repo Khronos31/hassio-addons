@@ -46,6 +46,12 @@ RUN set -eux; \
 COPY BonDriver_S1UD.cpp /BonDriver_S1UD.cpp
 RUN g++ -std=c++17 -fPIC -shared -o /usr/local/lib/edcb/BonDriver_S1UD.so /BonDriver_S1UD.cpp -pthread
 
+# px4-userland (PX-Q3U4 / PX-MLT5PE 系) を直接開く BonDriver。
+# _T は地上波、_S は BS/CS。受信機の取り合いは flock で共有する。
+COPY BonDriver_Px4.cpp /BonDriver_Px4.cpp
+RUN g++ -std=c++17 -fPIC -shared -o /usr/local/lib/edcb/BonDriver_Px4_T.so /BonDriver_Px4.cpp -pthread \
+ && g++ -std=c++17 -fPIC -shared -DPX4_BONDRIVER_SATELLITE=1 -o /usr/local/lib/edcb/BonDriver_Px4_S.so /BonDriver_Px4.cpp -pthread
+
 FROM debian:bookworm-slim AS tuners
 
 RUN apt-get update \
@@ -73,6 +79,8 @@ RUN set -eux; \
     siano_firmware_url='https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/isdbt_rio.inp?id=e981caea6ed33c48d25b7dbf473327dbd01df163'; \
     siano_firmware_size='85840'; \
     siano_firmware_sha256='054520642d5d09cb7ab7d08dbd6fd9ba9365de56adf2e7d7d06927f9845ff818'; \
+    it930x_firmware_url='https://raw.githubusercontent.com/tsukumijima/px4_drv/c995c10138368283a720cec4fcbca157ccc0dbd3/etc/it930x-firmware.bin'; \
+    it930x_firmware_sha256='5213a5a38872661277a2cc1b2dfdfe88faf06f41205f460f3b51857f0568b484'; \
     git init -q /tmp/siano; \
     git -C /tmp/siano remote add origin https://github.com/Khronos31/siano-userland.git; \
     git -C /tmp/siano fetch -q --no-tags --depth 1 origin "$siano_tag_object"; \
@@ -100,11 +108,14 @@ RUN set -eux; \
     install -m 0755 /tmp/px4-build/px4-ts /usr/local/bin/px4-ts; \
     install -m 0755 /tmp/px4-build/px4ctl /usr/local/bin/px4ctl; \
     install -D -m 0755 /tmp/px4-build/libpx4-userland-ifd.so /usr/lib/px4-userland/libpx4-userland-ifd.so; \
+    curl -fsSL -o /lib/firmware/it930x-firmware.bin "$it930x_firmware_url"; \
+    printf '%s  %s\n' "$it930x_firmware_sha256" /lib/firmware/it930x-firmware.bin | sha256sum -c -; \
     curl -fsSL -o /tmp/recisdb.deb "$recisdb_deb"; \
     printf '%s  %s\n' "$recisdb_sha256" /tmp/recisdb.deb | sha256sum -c -; \
     apt-get update; \
     apt-get install -y --no-install-recommends /tmp/recisdb.deb; \
     install -m 0755 /tmp/tuner/px-s1ud-stream /tmp/tuner/px4-ts-stream /usr/local/bin/; \
+    install -m 0755 /tmp/tuner/px4-detect-q3u4 /usr/local/bin/px4-detect-q3u4; \
     mkdir -p /usr/local/src; \
     install -m 0644 /tmp/recisdb.deb /usr/local/src/recisdb.deb
 
@@ -122,8 +133,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /usr/local/bin/EpgTimerSrv /usr/local/bin/EpgDataCap_Bon /usr/local/bin/
-COPY --from=tuners /usr/local/bin/siano-ts /usr/local/bin/px-s1ud-stream /usr/local/bin/px4d /usr/local/bin/px4-ts /usr/local/bin/px4ctl /usr/local/bin/px4-ts-stream /usr/local/bin/
+COPY --from=tuners /usr/local/bin/siano-ts /usr/local/bin/px-s1ud-stream /usr/local/bin/px4d /usr/local/bin/px4-ts /usr/local/bin/px4ctl /usr/local/bin/px4-ts-stream /usr/local/bin/px4-detect-q3u4 /usr/local/bin/
 COPY --from=tuners /lib/firmware/isdbt_rio.inp /lib/firmware/isdbt_rio.inp
+COPY --from=tuners /lib/firmware/it930x-firmware.bin /lib/firmware/it930x-firmware.bin
 COPY --from=tuners /usr/local/src/recisdb.deb /tmp/recisdb.deb
 COPY --from=tuners /usr/lib/px4-userland /usr/lib/px4-userland
 RUN apt-get update \
