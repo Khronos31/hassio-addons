@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.5
+
+- USB に CCID カードリーダーが無いときは decode を自動で無効化
+  （B-CAS カード不在で recisdb が即終了し、スキャンが0局になるのを防ぐ）
+
 ## 0.1.4
 
 - decode=false のとき BonDriver_S1UD / _Px4 が recisdb を通さず TS を素通しするよう修正

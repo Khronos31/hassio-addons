@@ -19,6 +19,20 @@ if [ -f "$OPTIONS" ]; then
     fi
 fi
 
+# B-CAS カードリーダー (USB CCID) が無いと recisdb decode は即終了して
+# TS が流れなくなる。リーダーが刺さっていないときは decode を無効化する。
+has_ccid=0
+for iface in /sys/bus/usb/devices/*/*/bInterfaceClass; do
+    if [ -r "$iface" ] && [ "$(cat "$iface")" = "0b" ]; then
+        has_ccid=1
+        break
+    fi
+done
+if [ "$has_ccid" -eq 0 ] && [ "$DECODE" -eq 1 ]; then
+    echo "USB に CCID カードリーダーが見つからないため decode を無効化します (recisdb はカード不在で即終了するため)。"
+    DECODE=0
+fi
+
 host_ip=
 if [ -n "$MIRAKC_URL" ]; then
     case "$MIRAKC_URL" in
