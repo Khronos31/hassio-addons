@@ -291,15 +291,29 @@ void reader_main(Driver* d, int fd) {
 }
 
 int claim_receiver(Driver* d) {
-    mkdir("/run/edcb-px4", 0755);
+    const char* lock_dir = getenv("EDCB_PX4_LOCK_DIR");
+    char default_lock_dir[1024];
+    if (lock_dir == nullptr) {
+#ifdef __APPLE__
+        const char* tmpdir = getenv("TMPDIR");
+        if (tmpdir == nullptr) {
+            tmpdir = "/tmp";
+        }
+        snprintf(default_lock_dir, sizeof default_lock_dir, "%s/edcb-px4", tmpdir);
+        lock_dir = default_lock_dir;
+#else
+        lock_dir = "/run/edcb-px4";
+#endif
+    }
+    mkdir(lock_dir, 0755);
     int size = receiver_pool_size(d);
     for (int i = 0; i < size; i++) {
         int receiver = receiver_in_pool(d, i);
         if (receiver < 0) {
             continue;
         }
-        char path[128];
-        snprintf(path, sizeof path, "/run/edcb-px4/%s-%d.lock", d->serial, receiver);
+        char path[1024];
+        snprintf(path, sizeof path, "%s/%s-%d.lock", lock_dir, d->serial, receiver);
         int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
         if (fd < 0) {
             continue;
@@ -379,8 +393,26 @@ bool spawn_pipeline(Driver* d, const char* channel, bool decode) {
         setenv("PX4_DEVICE", d->serial, 1);
         setenv("PX4_RECEIVER", receiver, 1);
         setenv("PX4_MODEL", d->model != nullptr ? d->model->key : "", 1);
+        char runtime_dir[1024];
+        const char* tmpdir = getenv("TMPDIR");
+        if (tmpdir == nullptr) {
+            tmpdir = "/tmp";
+        }
+#ifdef __APPLE__
+        snprintf(runtime_dir, sizeof runtime_dir, "%s/px4-userland", tmpdir);
+        setenv("PX4_RUNTIME_DIR", runtime_dir, 0);
+        const char* stream_bin = getenv("PX4_TS_STREAM");
+        if (stream_bin == nullptr) {
+            stream_bin = "/opt/homebrew/bin/px4-ts-stream";
+        }
+#else
         setenv("PX4_RUNTIME_DIR", "/run/px4-userland", 0);
-        execl("/usr/local/bin/px4-ts-stream", "px4-ts-stream", channel, nullptr);
+        const char* stream_bin = getenv("PX4_TS_STREAM");
+        if (stream_bin == nullptr) {
+            stream_bin = "/usr/local/bin/px4-ts-stream";
+        }
+#endif
+        execl(stream_bin, "px4-ts-stream", channel, nullptr);
         _exit(127);
     }
     close(to_decode[1]);
@@ -399,7 +431,15 @@ bool spawn_pipeline(Driver* d, const char* channel, bool decode) {
             close(to_decode[0]);
             close(from_decode[0]);
             close(from_decode[1]);
-            execl("/usr/bin/recisdb", "recisdb", "decode", "--input", "-", "-", nullptr);
+            const char* bin = getenv("RECISDB");
+            if (bin == nullptr) {
+#ifdef __APPLE__
+                bin = "/opt/homebrew/bin/recisdb";
+#else
+                bin = "/usr/bin/recisdb";
+#endif
+            }
+            execl(bin, "recisdb", "decode", "--input", "-", "-", nullptr);
             _exit(127);
         }
         close(to_decode[0]);

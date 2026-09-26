@@ -6,13 +6,21 @@ set -eu
 # 同じ置き方の EDCB アドオンのホスト名を決める。
 self_host=$(hostname)
 case "$self_host" in
-    *-konomitv) edcb_host=${self_host%-konomitv}-edcb ;;
-    *) edcb_host=edcb ;;
+    *-konomitv)
+        prefix=${self_host%-konomitv}
+        edcb_host=${prefix}-edcb
+        mirakc_host=${prefix}-mirakc
+        ;;
+    *)
+        edcb_host=edcb
+        mirakc_host=mirakc
+        ;;
 esac
 
 if [ ! -f /config/config.yaml ]; then
-    sed "s/@EDCB_HOST@/${edcb_host}/g" /code/config.default.yaml > /config/config.yaml
-    echo "設定を作りました: /config/config.yaml (edcb_url のホストは ${edcb_host})"
+    sed -e "s/@EDCB_HOST@/${edcb_host}/g" -e "s/@MIRAKC_HOST@/${mirakc_host}/g" \
+        /code/config.default.yaml > /config/config.yaml
+    echo "設定を作りました: /config/config.yaml (edcb_url=${edcb_host}, mirakurun_url=${mirakc_host})"
 fi
 ln -sfn /config/config.yaml /code/config.yaml
 

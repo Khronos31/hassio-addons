@@ -166,10 +166,24 @@ void reader_main(Driver* d, int fd) {
 }
 
 int claim_adapter(Driver* d) {
-    mkdir("/run/edcb-s1ud", 0755);
+    const char* lock_dir = getenv("EDCB_S1UD_LOCK_DIR");
+    char default_lock_dir[1024];
+    if (lock_dir == nullptr) {
+#ifdef __APPLE__
+        const char* tmpdir = getenv("TMPDIR");
+        if (tmpdir == nullptr) {
+            tmpdir = "/tmp";
+        }
+        snprintf(default_lock_dir, sizeof default_lock_dir, "%s/edcb-s1ud", tmpdir);
+        lock_dir = default_lock_dir;
+#else
+        lock_dir = "/run/edcb-s1ud";
+#endif
+    }
+    mkdir(lock_dir, 0755);
     for (int adapter = 0; adapter < 8; adapter++) {
-        char path[64];
-        snprintf(path, sizeof path, "/run/edcb-s1ud/%d.lock", adapter);
+        char path[1024];
+        snprintf(path, sizeof path, "%s/%d.lock", lock_dir, adapter);
         int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
         if (fd < 0) {
             continue;
@@ -245,7 +259,15 @@ bool spawn_pipeline(Driver* d, const char* channel, bool decode) {
         snprintf(adapter, sizeof adapter, "%d", d->adapter);
         setenv("PX_S1UD_ADAPTER", adapter, 1);
         setenv("PX_S1UD_FIRMWARE", "/lib/firmware/isdbt_rio.inp", 0);
-        execl("/usr/local/bin/px-s1ud-stream", "px-s1ud-stream", channel, nullptr);
+        const char* bin = getenv("PX_S1UD_STREAM");
+        if (bin == nullptr) {
+#ifdef __APPLE__
+            bin = "/opt/homebrew/bin/px-s1ud-stream";
+#else
+            bin = "/usr/local/bin/px-s1ud-stream";
+#endif
+        }
+        execl(bin, "px-s1ud-stream", channel, nullptr);
         _exit(127);
     }
     close(to_decode[1]);
@@ -264,7 +286,15 @@ bool spawn_pipeline(Driver* d, const char* channel, bool decode) {
             close(to_decode[0]);
             close(from_decode[0]);
             close(from_decode[1]);
-            execl("/usr/bin/recisdb", "recisdb", "decode", "--input", "-", "-", nullptr);
+            const char* bin = getenv("RECISDB");
+            if (bin == nullptr) {
+#ifdef __APPLE__
+                bin = "/opt/homebrew/bin/recisdb";
+#else
+                bin = "/usr/bin/recisdb";
+#endif
+            }
+            execl(bin, "recisdb", "decode", "--input", "-", "-", nullptr);
             _exit(127);
         }
         close(to_decode[0]);

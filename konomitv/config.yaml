@@ -1,5 +1,5 @@
 name: KonomiTV
-version: "0.1.0"
+version: "0.1.1"
 slug: konomitv
 description: "KonomiTV 0.14.1。番組表・予約・放送波は EDCB。録画先は /media 以下を設定ファイルで指定する。"
 url: https://github.com/Khronos31/hassio-addons/tree/main/konomitv
@@ -17,7 +17,12 @@ map:
   # EDCB の設定フォルダにある SrvPipe の FIFO を読む。
   - type: all_addon_configs
     read_only: true
-# 画面は Ingress だけ。7000 番はコンテナの中で待ち受けるが、ホストには出さない。
+# LAN から直接 KonomiTV を見るとき用。要らなければ構成タブで空欄にすれば閉じられる。
+ports:
+  7000/tcp: 7000
+ports_description:
+  7000/tcp: "KonomiTV サーバー（LAN からの直接視聴用）"
+# 画面は Ingress と公開ポートの両方。7000 番はサーバー本体の待ち受け。
 ingress: true
 ingress_port: 7011
 panel_icon: mdi:television

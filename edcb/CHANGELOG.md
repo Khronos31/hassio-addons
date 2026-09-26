@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.7
+
+- Q3U4 系の内蔵カードスロットを pcscd に登録（recisdb の B-CAS 復号が動くように）
+- `[TVTEST]` へ Px4 BonDriver を自動登録（KonomiTV のライブ視聴で Q3U4 系を使えるように）
+- BS/CS の標準チャンネル一覧を同梱し、地上波スキャンとマージするようにした
+- TCP 4510 を公開（KonomiTV / TVTest が LAN から接続できる）
+- DOCS を「設定ファイルはここ、内容は本家ドキュメント参照」の構成に書き直し
+
 ## 0.1.6
 
 - px4-userland 対応機種を全16モデルに拡充（Q3U4 / Q3PE4 / Q3PE5 / W3U4 / W3PE4 / W3PE5 / MLT5PE / MLT8PE3 / MLT8PE5 / DTV02A-5TS-P / DTV02A-4TS-P / M1UR / S1UR / DTV03A-1TU / DTV02-1T1S-U / DTV02A-1T1S-U）

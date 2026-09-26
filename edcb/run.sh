@@ -19,8 +19,8 @@ if [ -f "$OPTIONS" ]; then
     fi
 fi
 
-# B-CAS カードリーダー (USB CCID) が無いと recisdb decode は即終了して
-# TS が流れなくなる。リーダーが刺さっていないときは decode を無効化する。
+# B-CAS カードリーダーの有無。PX-S1UD だけで使うときの decode 判定に使う
+# (px4 系には内蔵カードスロットがあるので、そちらが検出できれば USB CCID は不要)。
 has_ccid=0
 for iface in /sys/bus/usb/devices/*/*/bInterfaceClass; do
     if [ -r "$iface" ] && [ "$(cat "$iface")" = "0b" ]; then
@@ -28,10 +28,6 @@ for iface in /sys/bus/usb/devices/*/*/bInterfaceClass; do
         break
     fi
 done
-if [ "$has_ccid" -eq 0 ] && [ "$DECODE" -eq 1 ]; then
-    echo "USB に CCID カードリーダーが見つからないため decode を無効化します (recisdb はカード不在で即終了するため)。"
-    DECODE=0
-fi
 
 host_ip=
 if [ -n "$MIRAKC_URL" ]; then
@@ -78,10 +74,6 @@ if [ -n "$MIRAKC_URL" ]; then
             host_ip=
             ;;
     esac
-fi
-
-if [ -x /usr/sbin/pcscd ]; then
-    /usr/sbin/pcscd --foreground >> "$CFG/pcscd.log" 2>&1 &
 fi
 
 mkdir -p "$CFG" /media/EDCB "$LIB" /run/edcb-s1ud /run/edcb-px4 /run/px4-userland
@@ -154,6 +146,15 @@ EOF
     fi
 fi
 
+# BS/CS の標準チャンネル一覧を同梱シードから足す。地上波はスキャンで足す。
+if [ -f "$SEED/Setting/ChSet5.bs.txt" ]; then
+    mkdir -p "$CFG/Setting"
+    if [ ! -f "$CFG/Setting/ChSet5.txt" ] || ! awk -F'\t' '$3 == 4 || $3 == 6 || $3 == 7 { found = 1 } END { exit found ? 0 : 1 }' "$CFG/Setting/ChSet5.txt"; then
+        cat "$SEED/Setting/ChSet5.bs.txt" >> "$CFG/Setting/ChSet5.txt"
+        echo "BS/CS の標準チャンネル一覧を ChSet5.txt に足しました。"
+    fi
+fi
+
 rm -rf /var/local/edcb
 ln -s "$CFG" /var/local/edcb
 
@@ -205,6 +206,31 @@ set_bondriver_count() {
     ' "$ini" > "$ini.tmp" && mv "$ini.tmp" "$ini"
 }
 
+# KonomiTV の NWTV (ライブ視聴) は [TVTEST] に列挙された BonDriver しか
+# 使えない。px4 を検出したら Px4 BonDriver を追加する。
+set_tvtest() {
+    ini="$CFG/EpgTimerSrv.ini"
+    if [ -n "$PX4_DEVICE" ]; then
+        bon_list="BonDriver_S1UD.so BonDriver_Px4_T.so BonDriver_Px4_S.so"
+    else
+        bon_list="BonDriver_S1UD.so"
+    fi
+    awk -v bon_list="$bon_list" '
+        BEGIN { n = split(bon_list, b, " ") }
+        index($0, "[TVTEST]") == 1 { in_sec = 1; found = 1; print; print "Num=" n; for (i = 1; i <= n; i++) print (i - 1) "=" b[i]; next }
+        in_sec && /^\[/ { in_sec = 0 }
+        in_sec && (/^Num=/ || /^[0-9]+=/) { next }
+        { print }
+        END {
+            if (!found) {
+                print "\n[TVTEST]"
+                print "Num=" n
+                for (i = 1; i <= n; i++) print (i - 1) "=" b[i]
+            }
+        }
+    ' "$ini" > "$ini.tmp" && mv "$ini.tmp" "$ini"
+}
+
 # px4-userland 対応機種が刺さっていれば px4d を起こし、
 # BonDriver_Px4_T/S の本数を書き直す。受信機の取り合いは BonDriver 側の
 # flock で解決するので、Count は受信機の本数でよい。
@@ -238,6 +264,59 @@ if [ -x /usr/local/bin/px4-detect ] && [ -x /usr/local/bin/px4d ] && [ -r "$PX4_
         fi
     fi
 fi
+# px4 系の内蔵カードスロットを pcscd 経由で使うための reader 設定。
+# recisdb は pcscd 経由で B-CAS カードを開く。USB CCID (SCR3310 等) は
+# pcscd が起動時に自動検出するので設定不要。
+if [ -n "$PX4_DEVICE" ]; then
+    mkdir -p /etc/reader.conf.d
+    cat > /etc/reader.conf.d/px4-userland.conf <<EOF
+FRIENDLYNAME "PLEX PX4 Internal Card Reader"
+DEVICENAME   px4-userland:runtime=${PX4_RUNTIME_DIR}:device=${PX4_DEVICE}:access=user
+LIBPATH      /usr/lib/px4-userland/libpx4-userland-ifd.so
+CHANNELID    0
+EOF
+fi
+
+# USB CCID リーダーも px4 内蔵スロットも無い場合、recisdb decode は即終了して
+# TS が流れなくなるため decode を無効化する。
+if [ "$has_ccid" -eq 0 ] && [ -z "$PX4_DEVICE" ] && [ "$DECODE" -eq 1 ]; then
+    echo "カードリーダー (USB CCID / px4 内蔵) が見つからないため decode を無効化します (recisdb はカード不在で即終了するため)。"
+    DECODE=0
+fi
+
+if [ -x /usr/sbin/pcscd ]; then
+    /usr/sbin/pcscd --foreground >> "$CFG/pcscd.log" 2>&1 &
+fi
+
+# BS/CS の ChSet4 (サービス→物理チャンネル対応) を機種名付きで置く。
+# 中身は機種によらず同じで、ファイル名だけ BonDriver のチューナー名に合わせる。
+if [ -n "$PX4_MODEL" ] && [ -f "$SEED/Setting/ChSet4.bs.txt" ]; then
+    case "$PX4_MODEL" in
+        px_q3u4) px4_name=PX-Q3U4 ;;
+        px_q3pe4) px4_name=PX-Q3PE4 ;;
+        px_q3pe5) px4_name=PX-Q3PE5 ;;
+        px_w3u4) px4_name=PX-W3U4 ;;
+        px_w3pe4) px4_name=PX-W3PE4 ;;
+        px_w3pe5) px4_name=PX-W3PE5 ;;
+        px_mlt5pe) px4_name=PX-MLT5PE ;;
+        dtv02a_5ts_p) px4_name=DTV02A-5TS-P ;;
+        px_mlt8pe3) px4_name=PX-MLT8PE3 ;;
+        px_mlt8pe5) px4_name=PX-MLT8PE5 ;;
+        dtv02a_4ts_p) px4_name=DTV02A-4TS-P ;;
+        px_m1ur) px4_name=PX-M1UR ;;
+        px_s1ur) px4_name=PX-S1UR ;;
+        dtv03a_1tu) px4_name=DTV03A-1TU ;;
+        dtv02_1t1s_u) px4_name=DTV02-1T1S-U ;;
+        dtv02a_1t1s_u) px4_name=DTV02A-1T1S-U ;;
+        *) px4_name= ;;
+    esac
+    if [ -n "$px4_name" ] && [ ! -f "$CFG/Setting/BonDriver_Px4_S(${px4_name}).ChSet4.txt" ]; then
+        cp "$SEED/Setting/ChSet4.bs.txt" "$CFG/Setting/BonDriver_Px4_S(${px4_name}).ChSet4.txt"
+        echo "BS/CS のチャンネル対応を ${px4_name} 用に置きました。"
+    fi
+fi
+
+set_tvtest
 export PX4_DEVICE PX4_MODEL PX4_RUNTIME_DIR
 # BonDriver_S1UD / _Px4 が recisdb を通すかどうか。decode=false なら素通し。
 export EDCB_DECODE=${DECODE}

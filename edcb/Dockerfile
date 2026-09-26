@@ -143,6 +143,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* /tmp/recisdb.deb
 COPY --from=build /usr/local/lib/edcb /usr/local/lib/edcb
 COPY --from=build /usr/share/edcb/seed /usr/share/edcb/seed
+COPY seed/ChSet5.bs.txt /usr/share/edcb/seed/Setting/ChSet5.bs.txt
+COPY seed/ChSet4.bs.txt /usr/share/edcb/seed/Setting/ChSet4.bs.txt
 COPY run.sh /run.sh
 COPY chscan.sh /chscan.sh
 RUN chmod 755 /run.sh /chscan.sh /usr/local/bin/EpgTimerSrv /usr/local/bin/EpgDataCap_Bon

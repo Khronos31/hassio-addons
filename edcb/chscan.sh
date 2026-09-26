@@ -1,6 +1,7 @@
 #!/bin/sh
 # 地上波 BonDriver のチャンネルスキャン。EPG取得の前にチャンネル一覧が要る。
 # px4 (Q3U4/MLT5 系) が検出済みなら BonDriver_Px4_T.so、無ければ BonDriver_S1UD.so。
+# BS/CS は起動時に同梱の標準一覧を ChSet5.txt へ足してあるのでスキャンしない。
 set -eu
 
 driver=BonDriver_S1UD.so

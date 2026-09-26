@@ -1,7 +1,7 @@
 name: EDCB
-version: "0.1.6"
+version: "0.1.7"
 slug: edcb
-description: "xtne6f 版 EDCB。siano-userland と px4-userland を同梱し、PX-S1UD は BonDriver_S1UD、px4-userland 対応機種（全16モデル）は BonDriver_Px4 で開く。"
+description: "xtne6f 版 EDCB。siano-userland と px4-userland を同梱し、PX-S1UD は BonDriver_S1UD、px4-userland 対応機種は BonDriver_Px4 で開く。"
 url: https://github.com/Khronos31/hassio-addons/tree/main/edcb
 arch:
   - amd64
@@ -20,8 +20,10 @@ map:
 #    要らなければ構成タブで空欄にすれば閉じられる。
 ports:
   5510/tcp: 5510
+  4510/tcp: 4510
 ports_description:
   5510/tcp: "EDCB の Web UI（認証なし）"
+  4510/tcp: "EpgTimerSrv の TCP API（KonomiTV / TVTest 用・認証なし）"
 ingress: true
 ingress_port: 5510
 panel_icon: mdi:television-guide
