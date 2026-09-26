@@ -1,5 +1,5 @@
 name: EDCB
-version: "0.1.3"
+version: "0.1.4"
 slug: edcb
 description: "xtne6f 版 EDCB。siano-userland と px4-userland を同梱し、PX-S1UD は BonDriver_S1UD、PX-Q3U4 / PX-MLT5PE 系は BonDriver_Px4 で開く。"
 url: https://github.com/Khronos31/hassio-addons/tree/main/edcb

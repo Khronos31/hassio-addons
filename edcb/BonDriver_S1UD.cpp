@@ -212,22 +212,35 @@ void close_tuner(void* p) {
     d->have_channel = false;
 }
 
-bool spawn_pipeline(Driver* d, const char* channel) {
+bool spawn_pipeline(Driver* d, const char* channel, bool decode) {
     int to_decode[2] = {-1, -1};
     int from_decode[2] = {-1, -1};
-    if (pipe(to_decode) != 0 || pipe(from_decode) != 0) {
+    if (pipe(to_decode) != 0) {
+        return false;
+    }
+    if (decode && pipe(from_decode) != 0) {
+        close(to_decode[0]);
+        close(to_decode[1]);
         return false;
     }
     pid_t stream = fork();
     if (stream < 0) {
+        close(to_decode[0]);
+        close(to_decode[1]);
+        if (decode) {
+            close(from_decode[0]);
+            close(from_decode[1]);
+        }
         return false;
     }
     if (stream == 0) {
         dup2(to_decode[1], STDOUT_FILENO);
         close(to_decode[0]);
         close(to_decode[1]);
-        close(from_decode[0]);
-        close(from_decode[1]);
+        if (decode) {
+            close(from_decode[0]);
+            close(from_decode[1]);
+        }
         char adapter[16];
         snprintf(adapter, sizeof adapter, "%d", d->adapter);
         setenv("PX_S1UD_ADAPTER", adapter, 1);
@@ -235,30 +248,43 @@ bool spawn_pipeline(Driver* d, const char* channel) {
         execl("/usr/local/bin/px-s1ud-stream", "px-s1ud-stream", channel, nullptr);
         _exit(127);
     }
-    pid_t decode = fork();
-    if (decode < 0) {
-        kill_pid(stream);
-        return false;
-    }
-    if (decode == 0) {
-        dup2(to_decode[0], STDIN_FILENO);
-        dup2(from_decode[1], STDOUT_FILENO);
-        close(to_decode[0]);
-        close(to_decode[1]);
-        close(from_decode[0]);
-        close(from_decode[1]);
-        execl("/usr/bin/recisdb", "recisdb", "decode", "--input", "-", "-", nullptr);
-        _exit(127);
-    }
-    close(to_decode[0]);
     close(to_decode[1]);
-    close(from_decode[1]);
-    d->stream_pid = stream;
-    d->decode_pid = decode;
-    d->read_fd = from_decode[0];
+    if (decode) {
+        pid_t recisdb_pid = fork();
+        if (recisdb_pid < 0) {
+            kill_pid(stream);
+            close(to_decode[0]);
+            close(from_decode[0]);
+            close(from_decode[1]);
+            return false;
+        }
+        if (recisdb_pid == 0) {
+            dup2(to_decode[0], STDIN_FILENO);
+            dup2(from_decode[1], STDOUT_FILENO);
+            close(to_decode[0]);
+            close(from_decode[0]);
+            close(from_decode[1]);
+            execl("/usr/bin/recisdb", "recisdb", "decode", "--input", "-", "-", nullptr);
+            _exit(127);
+        }
+        close(to_decode[0]);
+        close(from_decode[1]);
+        d->stream_pid = stream;
+        d->decode_pid = recisdb_pid;
+        d->read_fd = from_decode[0];
+    } else {
+        d->stream_pid = stream;
+        d->decode_pid = -1;
+        d->read_fd = to_decode[0];
+    }
     d->stop = false;
     d->reader = std::thread(reader_main, d, d->read_fd);
     return true;
+}
+
+bool want_decode() {
+    const char* env = getenv("EDCB_DECODE");
+    return env == nullptr || strcmp(env, "0") != 0;
 }
 
 BOOL tune(Driver* d, int physical) {
@@ -269,7 +295,7 @@ BOOL tune(Driver* d, int physical) {
     stop_pipeline(d, lock);
     char channel[8];
     snprintf(channel, sizeof channel, "T%d", physical);
-    if (!spawn_pipeline(d, channel)) {
+    if (!spawn_pipeline(d, channel, want_decode())) {
         return 0;
     }
     d->cv.wait_for(lock, std::chrono::seconds(4), [&] { return d->got_bytes || d->stop; });

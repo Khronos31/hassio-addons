@@ -218,6 +218,8 @@ if [ -x /usr/local/bin/px4-detect-q3u4 ] && [ -x /usr/local/bin/px4d ] && [ -r "
     fi
 fi
 export PX4_DEVICE PX4_RUNTIME_DIR
+# BonDriver_S1UD / _Px4 が recisdb を通すかどうか。decode=false なら素通し。
+export EDCB_DECODE=${DECODE}
 
 # チャンネル一覧が無いと Web UI の EPG取得は「開始できませんでした」になる。
 # 地上波用 BonDriver で一度だけスキャンし、結果は Setting/ に残る。

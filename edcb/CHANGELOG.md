@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4
+
+- decode=false のとき BonDriver_S1UD / _Px4 が recisdb を通さず TS を素通しするよう修正
+  （B-CAS カード不在時は recisdb が即終了し、チャンネルスキャンが0局になっていた）
+
 ## 0.1.3
 
 - px4d のランタイムディレクトリを 0700 に設定（px4d が起動しない問題の修正）
