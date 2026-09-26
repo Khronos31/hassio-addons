@@ -71,6 +71,8 @@ if [ -x /usr/sbin/pcscd ]; then
 fi
 
 mkdir -p "$CFG" /media/EDCB "$LIB" /run/edcb-s1ud /run/edcb-px4 /run/px4-userland
+# px4d はランタイムディレクトリが 0700 であることを要求する (validate_directory)。
+chmod 0700 /run/px4-userland
 if [ ! -f "$CFG/EpgTimerSrv.ini" ]; then
     echo "設定が無いので初期ファイルを置きます: ${CFG}"
     cp -a "$SEED"/. "$CFG"/
