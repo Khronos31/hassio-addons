@@ -1,6 +1,6 @@
 # EDCB
 
-xtne6f 版 EDCB の Unix 版です。PX-S1UD は同梱の BonDriver_S1UD が、PX-Q3U4 / PX-MLT5PE 系は同梱の BonDriver_Px4_T / _S が直接開きます。siano-userland、px4-userland、recisdb も同梱です。mirakc アドオンと同時に USB チューナーは開きません。
+xtne6f 版 EDCB の Unix 版です。PX-S1UD は同梱の BonDriver_S1UD が、px4-userland 対応機種（全16モデル）は同梱の BonDriver_Px4_T / _S が直接開きます。siano-userland、px4-userland、recisdb も同梱です。mirakc アドオンと同時に USB チューナーは開きません。
 
 画面はサイドバーの EDCB から開きます。Ingress が `/api/hassio_ingress/…` を剥がしてから 5510 へ渡します。ポート 5510 も残してあり、LAN から `http://<Home Assistant のアドレス>:5510/` でも開けます。どちらも認証はありません。
 

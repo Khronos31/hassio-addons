@@ -205,42 +205,74 @@ set_bondriver_count() {
     ' "$ini" > "$ini.tmp" && mv "$ini.tmp" "$ini"
 }
 
-# PX-Q3U4 / PX-MLT5PE 系 (px4-userland) が刺さっていれば px4d を起こし、
+# px4-userland 対応機種が刺さっていれば px4d を起こし、
 # BonDriver_Px4_T/S の本数を書き直す。受信機の取り合いは BonDriver 側の
 # flock で解決するので、Count は受信機の本数でよい。
 PX4_DEVICE=
+PX4_MODEL=
 PX4_FIRMWARE=/lib/firmware/it930x-firmware.bin
 PX4_RUNTIME_DIR=/run/px4-userland
-if [ -x /usr/local/bin/px4-detect-q3u4 ] && [ -x /usr/local/bin/px4d ] && [ -r "$PX4_FIRMWARE" ]; then
-    if PX4_DEVICE=$(/usr/local/bin/px4-detect-q3u4 2>/dev/null); then
-        case "$PX4_DEVICE" in
-            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
-                T_COUNT=4; S_COUNT=4 ;;  # Q3U4: 地上波 4 / BS・CS 4
-            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
-                T_COUNT=5; S_COUNT=5 ;;  # MLT5 系: 5 受信機が地上波/衛星を兼ねる
+if [ -x /usr/local/bin/px4-detect ] && [ -x /usr/local/bin/px4d ] && [ -r "$PX4_FIRMWARE" ]; then
+    if detection=$(/usr/local/bin/px4-detect 2>/dev/null); then
+        PX4_MODEL=${detection%% *}
+        PX4_DEVICE=${detection#* }
+        case "$PX4_MODEL" in
+            px_q3u4|px_q3pe4|px_q3pe5) T_COUNT=4; S_COUNT=4 ;;
+            px_w3u4|px_w3pe4|px_w3pe5) T_COUNT=2; S_COUNT=2 ;;
+            px_mlt5pe|dtv02a_5ts_p|px_mlt8pe5) T_COUNT=5; S_COUNT=5 ;;
+            px_mlt8pe3) T_COUNT=3; S_COUNT=3 ;;
+            dtv02a_4ts_p) T_COUNT=4; S_COUNT=4 ;;
+            px_m1ur|dtv02_1t1s_u|dtv02a_1t1s_u) T_COUNT=1; S_COUNT=1 ;;
+            px_s1ur|dtv03a_1tu) T_COUNT=1; S_COUNT=0 ;;
             *)
-                echo "px4 の検出結果が読めません: ${PX4_DEVICE}" >&2
+                echo "px4 の検出結果が読めません: ${detection}" >&2
                 PX4_DEVICE=
+                PX4_MODEL=
                 ;;
         esac
         if [ -n "$PX4_DEVICE" ]; then
-            echo "px4 を検出しました: ${PX4_DEVICE} (T=${T_COUNT}, S=${S_COUNT})。px4d を起動します。"
+            echo "px4 を検出しました: ${PX4_MODEL} ${PX4_DEVICE} (T=${T_COUNT}, S=${S_COUNT})。px4d を起動します。"
             /usr/local/bin/px4d --device "$PX4_DEVICE" --firmware "$PX4_FIRMWARE" --runtime-dir "$PX4_RUNTIME_DIR" &
             set_bondriver_count "BonDriver_Px4_T.so" "$T_COUNT" 4
             set_bondriver_count "BonDriver_Px4_S.so" "$S_COUNT" 5
         fi
     fi
 fi
-export PX4_DEVICE PX4_RUNTIME_DIR
+export PX4_DEVICE PX4_MODEL PX4_RUNTIME_DIR
 # BonDriver_S1UD / _Px4 が recisdb を通すかどうか。decode=false なら素通し。
 export EDCB_DECODE=${DECODE}
 
 # チャンネル一覧が無いと Web UI の EPG取得は「開始できませんでした」になる。
 # 地上波用 BonDriver で一度だけスキャンし、結果は Setting/ に残る。
+# EpgTimerSrv は起動時にしか ChSet5.txt を読み込まないため、初回はスキャン完了後に
+# サーバーを再起動してチャンネル一覧を読み込ませる。
+scan_pid=
 if [ ! -f "$CFG/chscan.done" ]; then
     echo "チャンネルスキャンを開始します。記録は ${CFG}/chscan.log です。"
-    setsid /chscan.sh >> "$CFG/chscan.log" 2>&1 < /dev/null &
+    /chscan.sh >> "$CFG/chscan.log" 2>&1 < /dev/null &
+    scan_pid=$!
 fi
 
 echo "EDCB を起動します。mirakc_url=${MIRAKC_URL:-空} decode=${DECODE}。チューナー本数は EpgTimerSrv.ini の Count です。"
-exec /usr/local/bin/EpgTimerSrv
+/usr/local/bin/EpgTimerSrv &
+srv_pid=$!
+
+terminate() {
+    kill -TERM "$srv_pid" 2>/dev/null || true
+}
+trap terminate TERM INT
+
+if [ -n "$scan_pid" ]; then
+    wait "$scan_pid" || true
+    if [ -f "$CFG/chscan.done" ]; then
+        echo "チャンネルスキャンが完了したので、EDCB を再起動してチャンネル一覧を読み込みます。"
+        terminate
+        wait "$srv_pid" 2>/dev/null || true
+        /usr/local/bin/EpgTimerSrv &
+        srv_pid=$!
+    else
+        echo "チャンネルスキャンが失敗しました。EDCB はチャンネル一覧なしで起動したままです。" >&2
+    fi
+fi
+
+wait "$srv_pid"

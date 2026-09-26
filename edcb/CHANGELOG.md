@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.6
+
+- px4-userland 対応機種を全16モデルに拡充（Q3U4 / Q3PE4 / Q3PE5 / W3U4 / W3PE4 / W3PE5 / MLT5PE / MLT8PE3 / MLT8PE5 / DTV02A-5TS-P / DTV02A-4TS-P / M1UR / S1UR / DTV03A-1TU / DTV02-1T1S-U / DTV02A-1T1S-U）
+- 検出を px4-detect に刷新し、機種名と識別子を出力するように変更
+- BonDriver_Px4 と px4-ts-stream を機種別の受信機割り当てに対応
+- 初回チャンネルスキャン完了後に EpgTimerSrv を再起動してチャンネル一覧を読み込むよう修正（初回の EPG 取得が失敗する問題）
+
 ## 0.1.5
 
 - USB に CCID カードリーダーが無いときは decode を自動で無効化

@@ -115,7 +115,7 @@ RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends /tmp/recisdb.deb; \
     install -m 0755 /tmp/tuner/px-s1ud-stream /tmp/tuner/px4-ts-stream /usr/local/bin/; \
-    install -m 0755 /tmp/tuner/px4-detect-q3u4 /usr/local/bin/px4-detect-q3u4; \
+    install -m 0755 /tmp/tuner/px4-detect /usr/local/bin/px4-detect; \
     mkdir -p /usr/local/src; \
     install -m 0644 /tmp/recisdb.deb /usr/local/src/recisdb.deb
 
@@ -133,7 +133,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /usr/local/bin/EpgTimerSrv /usr/local/bin/EpgDataCap_Bon /usr/local/bin/
-COPY --from=tuners /usr/local/bin/siano-ts /usr/local/bin/px-s1ud-stream /usr/local/bin/px4d /usr/local/bin/px4-ts /usr/local/bin/px4ctl /usr/local/bin/px4-ts-stream /usr/local/bin/px4-detect-q3u4 /usr/local/bin/
+COPY --from=tuners /usr/local/bin/siano-ts /usr/local/bin/px-s1ud-stream /usr/local/bin/px4d /usr/local/bin/px4-ts /usr/local/bin/px4ctl /usr/local/bin/px4-ts-stream /usr/local/bin/px4-detect /usr/local/bin/
 COPY --from=tuners /lib/firmware/isdbt_rio.inp /lib/firmware/isdbt_rio.inp
 COPY --from=tuners /lib/firmware/it930x-firmware.bin /lib/firmware/it930x-firmware.bin
 COPY --from=tuners /usr/local/src/recisdb.deb /tmp/recisdb.deb

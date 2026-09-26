@@ -73,10 +73,13 @@ constexpr int kSpaceCount = 1;
 
 constexpr size_t kBufferCap = 8 * 1024 * 1024;
 
+struct ModelSpec;
+
 struct Driver {
     std::mutex mu;
     std::condition_variable cv;
     char serial[32] = {};
+    const ModelSpec* model = nullptr;
     int receiver = -1;
     int lock_fd = -1;
     pid_t stream_pid = -1;
@@ -105,15 +108,43 @@ void store_ascii(uint16_t* dst, const char* src) {
     *dst = 0;
 }
 
-const char* device_model(const Driver* d) {
-    size_t len = strlen(d->serial);
-    if (len == 14) {
-        return "PX-Q3U4";
+struct ModelSpec {
+    const char* key;
+    const char* name;
+    int t_pool[8];
+    int t_count;
+    int s_pool[8];
+    int s_count;
+};
+
+const ModelSpec* find_model(const char* key) {
+    static const ModelSpec kModels[] = {
+        {"px_q3u4", "PX-Q3U4", {2, 3, 6, 7}, 4, {0, 1, 4, 5}, 4},
+        {"px_q3pe4", "PX-Q3PE4", {2, 3, 6, 7}, 4, {0, 1, 4, 5}, 4},
+        {"px_q3pe5", "PX-Q3PE5", {2, 3, 6, 7}, 4, {0, 1, 4, 5}, 4},
+        {"px_w3u4", "PX-W3U4", {2, 3}, 2, {0, 1}, 2},
+        {"px_w3pe4", "PX-W3PE4", {2, 3}, 2, {0, 1}, 2},
+        {"px_w3pe5", "PX-W3PE5", {2, 3}, 2, {0, 1}, 2},
+        {"px_mlt5pe", "PX-MLT5PE", {0, 1, 2, 3, 4}, 5, {0, 1, 2, 3, 4}, 5},
+        {"dtv02a_5ts_p", "DTV02A-5TS-P", {0, 1, 2, 3, 4}, 5, {0, 1, 2, 3, 4}, 5},
+        {"px_mlt8pe3", "PX-MLT8PE3", {0, 1, 2}, 3, {0, 1, 2}, 3},
+        {"px_mlt8pe5", "PX-MLT8PE5", {0, 1, 2, 3, 4}, 5, {0, 1, 2, 3, 4}, 5},
+        {"dtv02a_4ts_p", "DTV02A-4TS-P", {0, 1, 2, 3}, 4, {0, 1, 2, 3}, 4},
+        {"px_m1ur", "PX-M1UR", {0}, 1, {0}, 1},
+        {"px_s1ur", "PX-S1UR", {0}, 1, {0, 0}, 0},
+        {"dtv03a_1tu", "DTV03A-1TU", {0}, 1, {0, 0}, 0},
+        {"dtv02_1t1s_u", "DTV02-1T1S-U", {0}, 1, {0}, 1},
+        {"dtv02a_1t1s_u", "DTV02A-1T1S-U", {0}, 1, {0}, 1},
+    };
+    if (key == nullptr || *key == '\0') {
+        return nullptr;
     }
-    if (len == 15) {
-        return "PX-MLT5";
+    for (const auto& model : kModels) {
+        if (strcmp(model.key, key) == 0) {
+            return &model;
+        }
     }
-    return "PX4";
+    return nullptr;
 }
 
 void init_names(Driver* d) {
@@ -121,7 +152,19 @@ void init_names(Driver* d) {
     if (env != nullptr && strlen(env) < sizeof(d->serial)) {
         snprintf(d->serial, sizeof(d->serial), "%s", env);
     }
-    store_ascii(d->tuner_name, device_model(d));
+    const char* model_env = getenv("PX4_MODEL");
+    if (model_env != nullptr && *model_env != '\0') {
+        d->model = find_model(model_env);
+    }
+    if (d->model == nullptr) {
+        size_t len = strlen(d->serial);
+        if (len == 14) {
+            d->model = find_model("px_q3u4");
+        } else if (len == 15) {
+            d->model = find_model("px_mlt5pe");
+        }
+    }
+    store_ascii(d->tuner_name, d->model != nullptr ? d->model->name : "PX4");
 #ifdef PX4_BONDRIVER_SATELLITE
     for (int i = 0; i < kBsCount; i++) {
         int tp = 1 + 2 * (i / kBsSlots);
@@ -151,40 +194,31 @@ void init_names(Driver* d) {
 }
 
 int receiver_pool_size(const Driver* d) {
-    size_t len = strlen(d->serial);
-    if (len == 14) {
+    if (d->model == nullptr) {
+        return 0;
+    }
 #ifdef PX4_BONDRIVER_SATELLITE
-        return 4;  // Q3U4 BS/CS: 0,1,4,5
+    return d->model->s_count;
 #else
-        return 4;  // Q3U4 GR: 2,3,6,7
+    return d->model->t_count;
 #endif
-    }
-    if (len == 15) {
-        return 5;  // MLT5 系: 0..4
-    }
-    return 0;
 }
 
 int receiver_in_pool(const Driver* d, int index) {
-    size_t len = strlen(d->serial);
-    if (len == 14) {
+    if (d->model == nullptr || index < 0) {
+        return -1;
+    }
 #ifdef PX4_BONDRIVER_SATELLITE
-        static const int pool[] = {0, 1, 4, 5};
+    if (index >= d->model->s_count) {
+        return -1;
+    }
+    return d->model->s_pool[index];
 #else
-        static const int pool[] = {2, 3, 6, 7};
+    if (index >= d->model->t_count) {
+        return -1;
+    }
+    return d->model->t_pool[index];
 #endif
-        if (index < 0 || index >= 4) {
-            return -1;
-        }
-        return pool[index];
-    }
-    if (len == 15) {
-        if (index < 0 || index >= 5) {
-            return -1;
-        }
-        return index;
-    }
-    return -1;
 }
 
 void kill_pid(pid_t pid) {
@@ -344,6 +378,7 @@ bool spawn_pipeline(Driver* d, const char* channel, bool decode) {
         snprintf(receiver, sizeof receiver, "%d", d->receiver);
         setenv("PX4_DEVICE", d->serial, 1);
         setenv("PX4_RECEIVER", receiver, 1);
+        setenv("PX4_MODEL", d->model != nullptr ? d->model->key : "", 1);
         setenv("PX4_RUNTIME_DIR", "/run/px4-userland", 0);
         execl("/usr/local/bin/px4-ts-stream", "px4-ts-stream", channel, nullptr);
         _exit(127);

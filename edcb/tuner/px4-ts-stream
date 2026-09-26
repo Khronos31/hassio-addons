@@ -16,44 +16,96 @@ if [ -z "${PX4_DEVICE+x}" ] || [ -z "$PX4_DEVICE" ]; then
     echo "PX4_DEVICE is required" >&2
     exit 2
 fi
+
+# PX4_MODEL が明示されていればそれを使う。無ければ旧来のシリアル長による推測。
 device_model=
-case $PX4_DEVICE in
-    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
-        device_model=q3u4
-        ;;
-    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
-        device_model=mlt5
-        ;;
-    *)
-        echo "Invalid PX4_DEVICE (expected 14 Q3U4 digits or 15 MLT5 digits): $PX4_DEVICE" >&2
-        exit 2
-        ;;
-esac
+if [ -n "${PX4_MODEL:-}" ]; then
+    case $PX4_MODEL in
+        px_q3u4|px_q3pe4|px_q3pe5|px_w3u4|px_mlt5pe|dtv02a_5ts_p|px_w3pe4|px_w3pe5|px_mlt8pe3|px_mlt8pe5|dtv02a_4ts_p|px_m1ur|px_s1ur|dtv03a_1tu|dtv02_1t1s_u|dtv02a_1t1s_u)
+            device_model=$PX4_MODEL
+            ;;
+        *)
+            echo "Invalid PX4_MODEL: $PX4_MODEL" >&2
+            exit 2
+            ;;
+    esac
+    case $device_model in
+        px_q3u4|px_q3pe4|px_q3pe5)
+            case $PX4_DEVICE in
+                [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+                *)
+                    echo "Invalid PX4_DEVICE (expected 14 digits for $device_model): $PX4_DEVICE" >&2
+                    exit 2
+                    ;;
+            esac
+            ;;
+        *)
+            case $PX4_DEVICE in
+                [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+                *)
+                    echo "Invalid PX4_DEVICE (expected 15 digits for $device_model): $PX4_DEVICE" >&2
+                    exit 2
+                    ;;
+            esac
+            ;;
+    esac
+else
+    case $PX4_DEVICE in
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+            device_model=px_q3u4
+            ;;
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+            device_model=px_mlt5pe
+            ;;
+        *)
+            echo "Invalid PX4_DEVICE (expected 14 Q3U4 digits or 15 MLT5 digits): $PX4_DEVICE" >&2
+            exit 2
+            ;;
+    esac
+fi
 
 if [ -z "${PX4_RECEIVER+x}" ] || [ -z "$PX4_RECEIVER" ]; then
     echo "PX4_RECEIVER is required" >&2
     exit 2
 fi
-case $device_model in
-    q3u4)
-        case $PX4_RECEIVER in
-            0|1|2|3|4|5|6|7) ;;
-            *)
-                echo "Invalid PX4_RECEIVER (expected 0..7): $PX4_RECEIVER" >&2
-                exit 2
-                ;;
-        esac
-        ;;
-    mlt5)
-        case $PX4_RECEIVER in
-            0|1|2|3|4) ;;
-            *)
-                echo "Invalid PX4_RECEIVER (expected 0..4): $PX4_RECEIVER" >&2
-                exit 2
-                ;;
-        esac
-        ;;
-esac
+
+# モデルごとの地上波/衛星受信機の一覧。衛星なしモデルは空文字列。
+t_receivers()
+{
+    case $1 in
+        px_q3u4|px_q3pe4|px_q3pe5) echo '2 3 6 7' ;;
+        px_w3u4|px_w3pe4|px_w3pe5) echo '2 3' ;;
+        px_mlt5pe|dtv02a_5ts_p|px_mlt8pe5) echo '0 1 2 3 4' ;;
+        px_mlt8pe3) echo '0 1 2' ;;
+        dtv02a_4ts_p) echo '0 1 2 3' ;;
+        px_m1ur|px_s1ur|dtv03a_1tu|dtv02_1t1s_u|dtv02a_1t1s_u) echo '0' ;;
+        *) echo '' ;;
+    esac
+}
+
+s_receivers()
+{
+    case $1 in
+        px_q3u4|px_q3pe4|px_q3pe5) echo '0 1 4 5' ;;
+        px_w3u4|px_w3pe4|px_w3pe5) echo '0 1' ;;
+        px_mlt5pe|dtv02a_5ts_p|px_mlt8pe5) echo '0 1 2 3 4' ;;
+        px_mlt8pe3) echo '0 1 2' ;;
+        dtv02a_4ts_p) echo '0 1 2 3' ;;
+        px_m1ur|dtv02_1t1s_u|dtv02a_1t1s_u) echo '0' ;;
+        px_s1ur|dtv03a_1tu) echo '' ;;
+        *) echo '' ;;
+    esac
+}
+
+contains()
+{
+    word=$1
+    shift
+    for item in "$@"; do
+        [ "$item" = "$word" ] && return 0
+    done
+    return 1
+}
 
 runtime_dir=${PX4_RUNTIME_DIR:-/run/px4-userland}
 if [ -z "$runtime_dir" ]; then
@@ -73,13 +125,10 @@ slot=
 case $channel in
     T1[3-9]|T[2-5][0-9]|T6[0-2])
         physical_channel=${channel#T}
-        case $device_model:$PX4_RECEIVER in
-            q3u4:2|q3u4:3|q3u4:6|q3u4:7|mlt5:0|mlt5:1|mlt5:2|mlt5:3|mlt5:4) ;;
-            *)
-                echo "Receiver $PX4_RECEIVER cannot receive terrestrial channel: $channel" >&2
-                exit 2
-                ;;
-        esac
+        if ! contains "$PX4_RECEIVER" $(t_receivers "$device_model"); then
+            echo "Receiver $PX4_RECEIVER cannot receive terrestrial channel on $device_model: $channel" >&2
+            exit 2
+        fi
         system=isdb-t
         frequency_khz=$((395142 + physical_channel * 6000))
         ;;
@@ -101,13 +150,10 @@ case $channel in
                 exit 2
                 ;;
         esac
-        case $device_model:$PX4_RECEIVER in
-            q3u4:0|q3u4:1|q3u4:4|q3u4:5|mlt5:0|mlt5:1|mlt5:2|mlt5:3|mlt5:4) ;;
-            *)
-                echo "Receiver $PX4_RECEIVER cannot receive satellite channel: $channel" >&2
-                exit 2
-                ;;
-        esac
+        if ! contains "$PX4_RECEIVER" $(s_receivers "$device_model"); then
+            echo "Receiver $PX4_RECEIVER cannot receive satellite channel on $device_model: $channel" >&2
+            exit 2
+        fi
         number_value=${number#0}
         system=isdb-s
         frequency_khz=$((1049480 + ((number_value - 1) / 2) * 38360))
@@ -121,13 +167,10 @@ case $channel in
                 exit 2
                 ;;
         esac
-        case $device_model:$PX4_RECEIVER in
-            q3u4:0|q3u4:1|q3u4:4|q3u4:5|mlt5:0|mlt5:1|mlt5:2|mlt5:3|mlt5:4) ;;
-            *)
-                echo "Receiver $PX4_RECEIVER cannot receive satellite channel: $channel" >&2
-                exit 2
-                ;;
-        esac
+        if ! contains "$PX4_RECEIVER" $(s_receivers "$device_model"); then
+            echo "Receiver $PX4_RECEIVER cannot receive satellite channel on $device_model: $channel" >&2
+            exit 2
+        fi
         system=isdb-s
         frequency_khz=$((1613000 + ((number - 2) / 2) * 40000))
         slot=0
