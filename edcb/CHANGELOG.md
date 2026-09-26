@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- px4d のランタイムディレクトリを 0700 に設定（px4d が起動しない問題の修正）
+
 ## 0.1.2
 
 - PX-Q3U4 / PX-MLT5PE 系を直接開く BonDriver_Px4_T / _S を追加
