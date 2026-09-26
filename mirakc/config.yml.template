@@ -71,80 +71,385 @@ tuners:
       - BS
       - CS
     command: >-
-      env PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+      env PX4_PROFILE=px_q3u4 PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
   - name: "PX-Q3U4 #1"
     types:
       - BS
       - CS
     command: >-
-      env PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+      env PX4_PROFILE=px_q3u4 PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
   - name: "PX-Q3U4 #2"
     types:
       - GR
     command: >-
-      env PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+      env PX4_PROFILE=px_q3u4 PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
   - name: "PX-Q3U4 #3"
     types:
       - GR
     command: >-
-      env PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+      env PX4_PROFILE=px_q3u4 PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
   - name: "PX-Q3U4 #4"
     types:
       - BS
       - CS
     command: >-
-      env PX4_RECEIVER=4 /usr/local/bin/px4-ts-stream {{{channel}}}
+      env PX4_PROFILE=px_q3u4 PX4_RECEIVER=4 /usr/local/bin/px4-ts-stream {{{channel}}}
   - name: "PX-Q3U4 #5"
     types:
       - BS
       - CS
     command: >-
-      env PX4_RECEIVER=5 /usr/local/bin/px4-ts-stream {{{channel}}}
+      env PX4_PROFILE=px_q3u4 PX4_RECEIVER=5 /usr/local/bin/px4-ts-stream {{{channel}}}
   - name: "PX-Q3U4 #6"
     types:
       - GR
     command: >-
-      env PX4_RECEIVER=6 /usr/local/bin/px4-ts-stream {{{channel}}}
+      env PX4_PROFILE=px_q3u4 PX4_RECEIVER=6 /usr/local/bin/px4-ts-stream {{{channel}}}
   - name: "PX-Q3U4 #7"
     types:
       - GR
     command: >-
-      env PX4_RECEIVER=7 /usr/local/bin/px4-ts-stream {{{channel}}}
-  - name: "PX-MLT5 #0"
+      env PX4_PROFILE=px_q3u4 PX4_RECEIVER=7 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE4 #0"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_q3pe4 PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE4 #1"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_q3pe4 PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE4 #2"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_q3pe4 PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE4 #3"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_q3pe4 PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE4 #4"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_q3pe4 PX4_RECEIVER=4 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE4 #5"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_q3pe4 PX4_RECEIVER=5 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE4 #6"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_q3pe4 PX4_RECEIVER=6 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE4 #7"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_q3pe4 PX4_RECEIVER=7 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE5 #0"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_q3pe5 PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE5 #1"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_q3pe5 PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE5 #2"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_q3pe5 PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE5 #3"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_q3pe5 PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE5 #4"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_q3pe5 PX4_RECEIVER=4 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE5 #5"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_q3pe5 PX4_RECEIVER=5 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE5 #6"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_q3pe5 PX4_RECEIVER=6 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-Q3PE5 #7"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_q3pe5 PX4_RECEIVER=7 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3U4 #0"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_w3u4 PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3U4 #1"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_w3u4 PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3U4 #2"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_w3u4 PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3U4 #3"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_w3u4 PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3PE4 #0"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_w3pe4 PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3PE4 #1"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_w3pe4 PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3PE4 #2"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_w3pe4 PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3PE4 #3"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_w3pe4 PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3PE5 #0"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_w3pe5 PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3PE5 #1"
+    types:
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_w3pe5 PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3PE5 #2"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_w3pe5 PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-W3PE5 #3"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_w3pe5 PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT5PE #0"
     types:
       - GR
       - BS
       - CS
     command: >-
-      env PX4_PROFILE=mlt5 PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
-  - name: "PX-MLT5 #1"
+      env PX4_PROFILE=px_mlt5pe PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT5PE #1"
     types:
       - GR
       - BS
       - CS
     command: >-
-      env PX4_PROFILE=mlt5 PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
-  - name: "PX-MLT5 #2"
+      env PX4_PROFILE=px_mlt5pe PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT5PE #2"
     types:
       - GR
       - BS
       - CS
     command: >-
-      env PX4_PROFILE=mlt5 PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
-  - name: "PX-MLT5 #3"
+      env PX4_PROFILE=px_mlt5pe PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT5PE #3"
     types:
       - GR
       - BS
       - CS
     command: >-
-      env PX4_PROFILE=mlt5 PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
-  - name: "PX-MLT5 #4"
+      env PX4_PROFILE=px_mlt5pe PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT5PE #4"
     types:
       - GR
       - BS
       - CS
     command: >-
-      env PX4_PROFILE=mlt5 PX4_RECEIVER=4 /usr/local/bin/px4-ts-stream {{{channel}}}
+      env PX4_PROFILE=px_mlt5pe PX4_RECEIVER=4 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV02A-5TS-P #0"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=dtv02a_5ts_p PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV02A-5TS-P #1"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=dtv02a_5ts_p PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV02A-5TS-P #2"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=dtv02a_5ts_p PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV02A-5TS-P #3"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=dtv02a_5ts_p PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV02A-5TS-P #4"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=dtv02a_5ts_p PX4_RECEIVER=4 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT8PE3 #0"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_mlt8pe3 PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT8PE3 #1"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_mlt8pe3 PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT8PE3 #2"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_mlt8pe3 PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT8PE5 #0"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_mlt8pe5 PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT8PE5 #1"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_mlt8pe5 PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT8PE5 #2"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_mlt8pe5 PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT8PE5 #3"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_mlt8pe5 PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-MLT8PE5 #4"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_mlt8pe5 PX4_RECEIVER=4 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV02A-4TS-P #0"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=dtv02a_4ts_p PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV02A-4TS-P #1"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=dtv02a_4ts_p PX4_RECEIVER=1 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV02A-4TS-P #2"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=dtv02a_4ts_p PX4_RECEIVER=2 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV02A-4TS-P #3"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=dtv02a_4ts_p PX4_RECEIVER=3 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-M1UR #0"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=px_m1ur PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "PX-S1UR #0"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=px_s1ur PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV03A-1TU #0"
+    types:
+      - GR
+    command: >-
+      env PX4_PROFILE=dtv03a_1tu PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV02-1T1S-U #0"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=dtv02_1t1s_u PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+  - name: "DTV02A-1T1S-U #0"
+    types:
+      - GR
+      - BS
+      - CS
+    command: >-
+      env PX4_PROFILE=dtv02a_1t1s_u PX4_RECEIVER=0 /usr/local/bin/px4-ts-stream {{{channel}}}
+
 
 # チューナー出力は生TS。復号はジョブ（EPGスキャン）には掛けない。
 filters:

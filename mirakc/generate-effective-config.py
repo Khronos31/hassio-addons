@@ -20,6 +20,21 @@ SIANO_ASSIGNMENT = re.compile(r"^PX_S1UD_ADAPTER=([0-9]+)$")
 Q3U4_ASSIGNMENT = re.compile(r"^PX4_RECEIVER=([0-9]+)$")
 SUPPORTED_RIO_IDS = frozenset(("3275:0080", "187f:0600", "187f:0302"))
 KNOWN_SIANO_VENDORS = frozenset(("3275", "187f"))
+PX4_MODELS = frozenset((
+    "px_q3u4", "px_q3pe4", "px_q3pe5",
+    "px_w3u4", "px_w3pe4", "px_w3pe5",
+    "px_mlt5pe", "dtv02a_5ts_p", "px_mlt8pe3", "px_mlt8pe5", "dtv02a_4ts_p",
+    "px_m1ur", "px_s1ur", "dtv03a_1tu", "dtv02_1t1s_u", "dtv02a_1t1s_u",
+))
+PX4_RECEIVER_UPPER_BOUND = {
+    "px_q3u4": 7, "px_q3pe4": 7, "px_q3pe5": 7,
+    "px_w3u4": 3, "px_w3pe4": 3, "px_w3pe5": 3,
+    "px_mlt5pe": 4, "dtv02a_5ts_p": 4, "px_mlt8pe5": 4,
+    "px_mlt8pe3": 2,
+    "dtv02a_4ts_p": 3,
+    "px_m1ur": 0, "px_s1ur": 0, "dtv03a_1tu": 0,
+    "dtv02_1t1s_u": 0, "dtv02a_1t1s_u": 0,
+}
 SIANO_DEVICE = re.compile(
     r"^([0-9]+|-):\s+([0-9A-Fa-f]{4}):([0-9A-Fa-f]{4})(?:\s+.*)?$"
 )
@@ -40,7 +55,9 @@ def parse_args():
     parser.add_argument("--siano-list", required=True, type=Path)
     parser.add_argument("--warmup-file", required=True, type=Path)
     parser.add_argument("--q3u4-enabled", choices=("0", "1"), required=True)
-    parser.add_argument("--px4-model", choices=("q3u4", "mlt5"), default="q3u4")
+    parser.add_argument(
+        "--px4-model", choices=tuple(sorted(PX4_MODELS)), default="px_q3u4"
+    )
     parser.add_argument("--siano-wrapper", default=SIANO_WRAPPER)
     parser.add_argument("--q3u4-wrapper", default=Q3U4_WRAPPER)
     return parser.parse_args()
@@ -171,8 +188,8 @@ def managed_index(tokens, assignment, assignment_prefix, description, upper_boun
 def px4_profile(tokens, description):
     values = [token for token in tokens if token.startswith("PX4_PROFILE=")]
     if not values:
-        return "q3u4"
-    if len(values) != 1 or values[0] not in ("PX4_PROFILE=q3u4", "PX4_PROFILE=mlt5"):
+        return "px_q3u4"
+    if len(values) != 1 or values[0].split("=", 1)[1] not in PX4_MODELS:
         raise ConfigError(f"managed tuner command has an invalid PX4 profile ({description})")
     return values[0].split("=", 1)[1]
 
@@ -211,7 +228,7 @@ def filter_tuners(tuners, adapters, q3u4_enabled, px4_model, siano_wrapper, q3u4
                 Q3U4_ASSIGNMENT,
                 Q3U4_ASSIGNMENT_PREFIX,
                 description,
-                upper_bound=4 if profile == "mlt5" else 7,
+                upper_bound=PX4_RECEIVER_UPPER_BOUND.get(profile, 7),
             )
             if q3u4_enabled and profile == px4_model:
                 retained.append(tuner)

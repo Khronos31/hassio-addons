@@ -1,0 +1,175 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# px4-userland 対応機種を sysfs から検出し、「モデル名 識別子」を1行で出力する。
+#
+#   2ブリッジ機 (PX-Q3U4 / PX-Q3PE4 / PX-Q3PE5):
+#     シリアル末尾1/2のペアから14桁ベースシリアルを識別子にする。
+#   1ブリッジ機 (それ以外):
+#     15桁 USB シリアルをそのまま識別子にする。
+#
+# 対応する USB ベンダー/プロダクト ID:
+#   0511:084a PX-Q3U4      0511:083f PX-W3U4      0511:024e PX-MLT5PE
+#   0511:924e DTV02A-5TS-P 0511:023f PX-W3PE4     0511:073f PX-W3PE5
+#   0511:024a PX-Q3PE4     0511:074a PX-Q3PE5     0511:0252 PX-MLT8PE3
+#   0511:0253 PX-MLT8PE5   0511:0254 DTV02A-4TS-P 0511:0854 PX-M1UR
+#   0511:0855 PX-S1UR      0511:0052 DTV03A-1TU  0511:004b DTV02-1T1S-U
+#   0511:084b DTV02A-1T1S-U
+set -eu
+
+LC_ALL=C
+export LC_ALL
+
+sysfs_root=${PX4_SYSFS_ROOT:-/sys/bus/usb/devices}
+tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/px4-detect.XXXXXX")
+
+cleanup()
+{
+    rm -rf "$tmp_dir" || :
+}
+
+cleanup_on_exit()
+{
+    status=$?
+    trap - EXIT HUP INT TERM
+    cleanup
+    exit "$status"
+}
+
+cleanup_on_signal()
+{
+    trap - EXIT HUP INT TERM
+    cleanup
+    exit 1
+}
+
+trap cleanup_on_exit EXIT
+trap cleanup_on_signal HUP INT TERM
+
+# モデル名とブリッジ数を出力する。未知のプロダクト ID は何も出力しない。
+model_for_product()
+{
+    case $1 in
+        084a) printf 'px_q3u4 2\n' ;;
+        024a) printf 'px_q3pe4 2\n' ;;
+        074a) printf 'px_q3pe5 2\n' ;;
+        083f) printf 'px_w3u4 1\n' ;;
+        024e) printf 'px_mlt5pe 1\n' ;;
+        924e) printf 'dtv02a_5ts_p 1\n' ;;
+        023f) printf 'px_w3pe4 1\n' ;;
+        073f) printf 'px_w3pe5 1\n' ;;
+        0252) printf 'px_mlt8pe3 1\n' ;;
+        0253) printf 'px_mlt8pe5 1\n' ;;
+        0254) printf 'dtv02a_4ts_p 1\n' ;;
+        0854) printf 'px_m1ur 1\n' ;;
+        0855) printf 'px_s1ur 1\n' ;;
+        0052) printf 'dtv03a_1tu 1\n' ;;
+        004b) printf 'dtv02_1t1s_u 1\n' ;;
+        084b) printf 'dtv02a_1t1s_u 1\n' ;;
+    esac
+}
+
+bridge_records=$tmp_dir/bridge2
+single_records=$tmp_dir/bridge1
+: > "$bridge_records"
+: > "$single_records"
+found_any=0
+
+for device_path in "$sysfs_root"/*; do
+    [ -d "$device_path" ] || continue
+    [ -r "$device_path/idVendor" ] || continue
+    [ -r "$device_path/idProduct" ] || continue
+    [ "$(cat "$device_path/idVendor")" = 0511 ] || continue
+
+    product=$(cat "$device_path/idProduct")
+    model_bridges=$(model_for_product "$product") || continue
+    [ -n "$model_bridges" ] || continue
+    found_any=1
+
+    if [ ! -r "$device_path/serial" ]; then
+        echo "PX4 device has no readable serial: $device_path" >&2
+        exit 1
+    fi
+    serial=$(cat "$device_path/serial")
+    case $serial in
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+        *)
+            echo "Invalid PX4 serial (expected 15 ASCII digits): $serial" >&2
+            exit 1
+            ;;
+    esac
+
+    model=${model_bridges% *}
+    bridges=${model_bridges#* }
+    if [ "$bridges" = 2 ]; then
+        base=${serial%?}
+        suffix=${serial#??????????????}
+        case $suffix in
+            1|2) ;;
+            *)
+                echo "Invalid 2-bridge serial suffix (expected 1 or 2): $serial" >&2
+                exit 1
+                ;;
+        esac
+        printf '%s %s %s\n' "$model" "$base" "$suffix" >> "$bridge_records"
+    else
+        printf '%s %s\n' "$model" "$serial" >> "$single_records"
+    fi
+done
+
+if [ "$found_any" -eq 0 ]; then
+    echo "No PX4 USB devices found" >&2
+    exit 1
+fi
+
+bridge_models=$(awk '{print $1}' "$bridge_records" | sort -u)
+single_models=$(awk '{print $1}' "$single_records" | sort -u)
+bridge_count=$(awk 'END {print NR}' "$bridge_records")
+single_count=$(awk 'END {print NR}' "$single_records")
+
+if [ "$bridge_count" -gt 0 ] && [ "$single_count" -gt 0 ]; then
+    echo "Multiple PX4 enclosures found (2-bridge and 1-bridge models)" >&2
+    exit 1
+fi
+
+if [ "$bridge_count" -gt 0 ]; then
+    [ "$(printf '%s\n' "$bridge_models" | awk 'END {print NR}')" -eq 1 ] || {
+        echo "Multiple PX4 enclosure models found: $(printf '%s ' $bridge_models)" >&2
+        exit 1
+    }
+    model=$bridge_models
+    base_list=$(awk '{print $2}' "$bridge_records" | sort -u)
+    pair_count=0
+    pair_base=
+    for base in $base_list; do
+        suffix_1_count=$(awk -v b="$base" '$2 == b && $3 == "1" { n++ } END { print n + 0 }' "$bridge_records")
+        suffix_2_count=$(awk -v b="$base" '$2 == b && $3 == "2" { n++ } END { print n + 0 }' "$bridge_records")
+        if [ "$suffix_1_count" -gt 1 ] || [ "$suffix_2_count" -gt 1 ]; then
+            echo "Duplicate 2-bridge serial suffix for base serial: $base" >&2
+            exit 1
+        fi
+        if [ "$suffix_1_count" -eq 1 ] && [ "$suffix_2_count" -eq 1 ]; then
+            pair_count=$((pair_count + 1))
+            pair_base=$base
+        elif [ "$suffix_1_count" -gt 0 ] || [ "$suffix_2_count" -gt 0 ]; then
+            echo "Incomplete 2-bridge serial pair for base serial: $base" >&2
+            exit 1
+        fi
+    done
+    case $pair_count in
+        1) printf '%s %s\n' "$model" "$pair_base" ;;
+        0) echo "2-bridge devices do not form one complete serial pair" >&2; exit 1 ;;
+        *) echo "Multiple complete 2-bridge serial pairs found: $pair_count" >&2; exit 1 ;;
+    esac
+    exit 0
+fi
+
+[ "$(printf '%s\n' "$single_models" | awk 'END {print NR}')" -eq 1 ] || {
+    echo "Multiple PX4 enclosure models found: $(printf '%s ' $single_models)" >&2
+    exit 1
+}
+model=$single_models
+case $single_count in
+    1) awk -v m="$model" '{print m, $2}' "$single_records" ;;
+    0) echo "No PX4 USB devices found" >&2; exit 1 ;;
+    *) echo "Multiple 1-bridge PX4 devices found: $single_count" >&2; exit 1 ;;
+esac

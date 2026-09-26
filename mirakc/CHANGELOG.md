@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.5
+
+- px4-userland 対応機種を全16モデルに拡充（Q3U4 / Q3PE4 / Q3PE5 / W3U4 / W3PE4 / W3PE5 / MLT5PE / MLT8PE3 / MLT8PE5 / DTV02A-5TS-P / DTV02A-4TS-P / M1UR / S1UR / DTV03A-1TU / DTV02-1T1S-U / DTV02A-1T1S-U）
+- 検出を px4-detect に刷新し、モデル名と識別子を出力するように変更
+- `config.yml.template` に全16モデル分のチューナー定義を追加。`generate-effective-config.py` と `px4-ts-stream` を機種別の受信機割り当てに対応
+- 1ブリッジ機の px4d ready 判定を `usb-present-mask=0x01` に対応（従来は 0x03 固定で MLT5 系がタイムアウトしていた）
+- reader config の `@PX4_ACCESS@` プレースホルダを置換するよう修正（px4-userland v0.1.6 のテンプレート変更で Q3U4 が起動できなくなっていた）
+
 ## 0.2.4
 
 - 同梱の siano-userland を v0.1.6（`ad9bc7361288e9c188a1d8235ab946ac8b7bd6ac`）へ更新

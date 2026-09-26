@@ -6,7 +6,7 @@ FROM docker.io/mirakc/mirakc:3.4.82-debian@sha256:26af4e0bdec9b0ef1e967c008cc588
 
 USER root
 
-COPY px-s1ud-stream px4-detect-q3u4 px4-ts-stream /usr/local/bin/
+COPY px-s1ud-stream px4-detect px4-ts-stream /usr/local/bin/
 COPY generate-effective-config.py /usr/local/bin/generate-effective-config.py
 COPY firmware-allowlist.txt px4-firmware-source.tsv /usr/share/mirakc-addon/
 COPY px4-acquire-firmware /usr/local/bin/px4-acquire-firmware
@@ -92,7 +92,7 @@ RUN set -eux; \
     install -m 0644 /tmp/px4-drv/fwtool/fwinfo.tsv \
         /usr/libexec/mirakc-addon/px4-fwtool/fwinfo.tsv; \
     install -D -m 0644 /tmp/px4-drv/LICENSE /usr/share/doc/px4_drv-fwtool/LICENSE; \
-    chmod 0755 /run.sh /usr/local/bin/px-s1ud-stream /usr/local/bin/px4-detect-q3u4 /usr/local/bin/px4-ts-stream /usr/local/bin/generate-effective-config.py /usr/local/bin/px4-acquire-firmware; \
+    chmod 0755 /run.sh /usr/local/bin/px-s1ud-stream /usr/local/bin/px4-detect /usr/local/bin/px4-ts-stream /usr/local/bin/generate-effective-config.py /usr/local/bin/px4-acquire-firmware; \
     dpkg-query -W -f='${binary:Package}\t${Version}\n' | LC_ALL=C sort \
         > /usr/share/mirakc-addon/build-package-versions.txt; \
     { \

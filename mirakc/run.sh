@@ -22,7 +22,7 @@ PX4_RUNTIME_DIR=${PX4_RUNTIME_DIR:-/run/px4-userland}
 READER_TEMPLATE=${PX4_READER_TEMPLATE:-/usr/share/mirakc-addon/pcsc/reader.conf.d/px4-userland.conf.in}
 READER_CONFIG=${PX4_READER_CONFIG:-/etc/reader.conf.d/px4-userland.conf}
 PX4_IFD_LIBRARY=${PX4_IFD_LIBRARY:-/usr/lib/px4-userland/libpx4-userland-ifd.so}
-DETECT_BIN=${PX4_DETECT_BIN:-/usr/local/bin/px4-detect-q3u4}
+DETECT_BIN=${PX4_DETECT_BIN:-/usr/local/bin/px4-detect}
 PX4D_BIN=${PX4D_BIN:-/usr/local/bin/px4d}
 PX4CTL_BIN=${PX4CTL_BIN:-/usr/local/bin/px4ctl}
 PCSC_BIN=${PCSC_BIN:-/usr/sbin/pcscd}
@@ -45,8 +45,9 @@ pcscd_pid=
 mirakc_pid=
 firmware_helper_pid=
 PX4_DEVICE=
+PX4_MODEL=
 q3u4_enabled=0
-px4_model=q3u4
+px4_model=
 q3_firmware_error=
 reader_tmp=
 shutdown_requested=0
@@ -185,10 +186,10 @@ ensure_q3u4_firmware()
     return 0
 }
 
-detect_q3u4()
+detect_px4()
 {
-    detector_stderr=$tmp_dir/q3u4-detector.err
-    if base_serial=$("$DETECT_BIN" 2>"$detector_stderr"); then
+    detector_stderr=$tmp_dir/px4-detector.err
+    if detection=$("$DETECT_BIN" 2>"$detector_stderr"); then
         if [ -s "$detector_stderr" ]; then
             cat "$detector_stderr" >&2
         fi
@@ -196,18 +197,26 @@ detect_q3u4()
         if [ -s "$detector_stderr" ]; then
             cat "$detector_stderr" >&2
         fi
-        echo "Q3U4 disabled: serial detection failed" >&2
+        echo "PX4 disabled: device detection failed" >&2
         return 1
     fi
-    case $base_serial in
-        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
-        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+    PX4_MODEL=${detection%% *}
+    PX4_DEVICE=${detection#* }
+    case $PX4_MODEL in
+        px_q3u4|px_q3pe4|px_q3pe5|px_w3u4|px_mlt5pe|dtv02a_5ts_p|px_w3pe4|px_w3pe5|px_mlt8pe3|px_mlt8pe5|dtv02a_4ts_p|px_m1ur|px_s1ur|dtv03a_1tu|dtv02_1t1s_u|dtv02a_1t1s_u) ;;
         *)
-            echo "PX4 disabled: detector returned an invalid device serial: $base_serial" >&2
+            echo "PX4 disabled: detector returned an invalid model: $detection" >&2
             return 1
             ;;
     esac
-    printf '%s\n' "$base_serial"
+    case $PX4_DEVICE in
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]|[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+        *)
+            echo "PX4 disabled: detector returned an invalid device serial: $PX4_DEVICE" >&2
+            return 1
+            ;;
+    esac
+    return 0
 }
 
 escape_sed_replacement()
@@ -269,6 +278,7 @@ write_reader_config()
         -e "s|@PX4_RUNTIME_DIR@|$runtime_escaped|g" \
         -e "s|@PX4_BASE_SERIAL@|$serial_escaped|g" \
         -e "s|@PX4_IFD_LIBRARY@|$library_escaped|g" \
+        -e "s|@PX4_ACCESS@|user|g" \
         "$READER_TEMPLATE" > "$reader_tmp"; then
         echo "could not generate reader config from template: $READER_TEMPLATE" >&2
         discard_reader_tmp || :
@@ -322,6 +332,11 @@ start_px4d()
 wait_px4_ready()
 {
     ready_deadline=$(($(date +%s) + PX4_READY_TIMEOUT_SECONDS))
+    # 2ブリッジ機は usb-present-mask=0x03、1ブリッジ機は 0x01。
+    px4_usb_mask=0x01
+    case $PX4_MODEL in
+        px_q3u4|px_q3pe4|px_q3pe5) px4_usb_mask=0x03 ;;
+    esac
     while :; do
         if ! pid_is_alive "$px4d_pid"; then
             echo "px4d exited before becoming ready" >&2
@@ -335,9 +350,9 @@ wait_px4_ready()
         if [ -n "$probe_output" ]; then
             printf '%s\n' "$probe_output" >&2
         fi
-        if [ "$probe_status" -eq 0 ] && printf '%s\n' "$probe_output" | awk '
+        if [ "$probe_status" -eq 0 ] && printf '%s\n' "$probe_output" | awk -v mask="$px4_usb_mask" '
             /(^|[[:space:]])ready=yes([[:space:]]|$)/ &&
-            /(^|[[:space:]])usb-present-mask=0x03([[:space:]]|$)/ { found = 1 }
+            $0 ~ ("(^|[[:space:]])usb-present-mask=" mask "([[:space:]]|$)") { found = 1 }
             END { exit found ? 0 : 1 }
         '; then
             echo "px4d ready: device=$PX4_DEVICE" >&2
@@ -511,22 +526,14 @@ if [ ! -r "$SIANO_FIRMWARE" ]; then
     exit 1
 fi
 
-if q3_base_serial=$(detect_q3u4); then
+if detect_px4; then
     if ensure_q3u4_firmware; then
-        PX4_DEVICE=$q3_base_serial
-        export PX4_DEVICE PX4_RUNTIME_DIR
+        px4_model=$PX4_MODEL
+        export PX4_DEVICE PX4_MODEL PX4_RUNTIME_DIR
         if ! write_reader_config; then
-            echo "Q3U4 setup failed: reader config/IFD preparation is fatal" >&2
+            echo "PX4 setup failed: reader config/IFD preparation is fatal" >&2
             exit 1
         fi
-        case $PX4_DEVICE in
-            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
-                px4_model=mlt5
-                ;;
-            *)
-                px4_model=q3u4
-                ;;
-        esac
         echo "PX4 enabled: model=$px4_model device=$PX4_DEVICE firmware=$Q3U4_FIRMWARE" >&2
         start_px4d
         if ! wait_px4_ready; then
@@ -538,14 +545,16 @@ if q3_base_serial=$(detect_q3u4); then
         if [ "$shutdown_requested" -ne 0 ]; then
             exit 0
         fi
-        echo "Q3U4 disabled: $q3_firmware_error" >&2
+        echo "PX4 disabled: $q3_firmware_error" >&2
         PX4_DEVICE=
-        export PX4_DEVICE PX4_RUNTIME_DIR
+        PX4_MODEL=
+        export PX4_DEVICE PX4_MODEL PX4_RUNTIME_DIR
         rm -f "$READER_CONFIG"
     fi
 else
     PX4_DEVICE=
-    export PX4_DEVICE PX4_RUNTIME_DIR
+    PX4_MODEL=
+    export PX4_DEVICE PX4_MODEL PX4_RUNTIME_DIR
     rm -f "$READER_CONFIG"
 fi
 

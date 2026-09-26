@@ -1,16 +1,35 @@
 # mirakc
 
-[mirakc](https://github.com/mirakc/mirakc) に、PX-S1UD / PX-Q3U4 用のユーザ空間ドライバ
-[siano-ts](https://github.com/Khronos31/siano-userland) と
+[mirakc](https://github.com/mirakc/mirakc) に、PX-S1UD と px4-userland 対応機種用の
+ユーザ空間ドライバ [siano-ts](https://github.com/Khronos31/siano-userland) と
 [px4-userland](https://github.com/Khronos31/px4-userland)、
 [recisdb](https://github.com/kazuki0824/recisdb-rs) を同梱したアドオンです。
 
 ## 用意するもの
 
 - PX-S1UD（`3275:0080`）。HAOS に Siano のカーネルドライバは入りません
-- PX-Q3U4（`0511:084a` の2台1組、任意）
-- PX-MLT5PE（`0511:024e`）または DTV02A-5TS-P（`0511:924e`）1台。Q3U4 とは同時に使わない
-- 復号には B-CAS カードが必要です。PX-Q3U4 は本体カードスロットを利用でき、PX-S1UD のみなら外付け PC/SC リーダが必要です
+- px4-userland 対応機種（下表の16モデル）からいずれか1機種。異なる機種を同時に使うことはできません
+
+| 機種 | USB ID | 受信機数 | 地上波 | BS/CS |
+|---|---|---|---|---|
+| PX-Q3U4 | `0511:084a`（2台1組） | 8 | 2,3,6,7 | 0,1,4,5 |
+| PX-Q3PE4 | `0511:024a`（2台1組） | 8 | 2,3,6,7 | 0,1,4,5 |
+| PX-Q3PE5 | `0511:074a`（2台1組） | 8 | 2,3,6,7 | 0,1,4,5 |
+| PX-W3U4 | `0511:083f` | 4 | 2,3 | 0,1 |
+| PX-W3PE4 | `0511:023f` | 4 | 2,3 | 0,1 |
+| PX-W3PE5 | `0511:073f` | 4 | 2,3 | 0,1 |
+| PX-MLT5PE | `0511:024e` | 5 | 0-4 | 0-4 |
+| DTV02A-5TS-P | `0511:924e` | 5 | 0-4 | 0-4 |
+| PX-MLT8PE3 | `0511:0252` | 3 | 0-2 | 0-2 |
+| PX-MLT8PE5 | `0511:0253` | 5 | 0-4 | 0-4 |
+| DTV02A-4TS-P | `0511:0254` | 4 | 0-3 | 0-3 |
+| PX-M1UR | `0511:0854` | 1 | 0 | 0 |
+| PX-S1UR | `0511:0855` | 1 | 0 | — |
+| DTV03A-1TU | `0511:0052` | 1 | 0 | — |
+| DTV02-1T1S-U | `0511:004b` | 1 | 0 | 0 |
+| DTV02A-1T1S-U | `0511:084b` | 1 | 0 | 0 |
+
+- 復号には B-CAS カードが必要です。PX-Q3U4 系は本体カードスロットを利用でき、PX-S1UD のみなら外付け PC/SC リーダが必要です
 
 録画は [EPGStation](../epgstation) アドオンが HTTP で引きます。
 
@@ -34,8 +53,8 @@
 `isdbt_rio.inp` は linux-firmware の再配布可能なバイナリです。イメージに同梱し、
 著作権表示は `LICENCE.siano` をイメージ内へ入れています。ソースリポジトリの git には入れていません。
 
-PX-Q3U4 の `it930x-firmware.bin` はイメージに同梱しません。Q3U4 を検出した起動で有効な
-キャッシュがない場合、アドオンは PLEX の Web サイトから公式ドライバZIPを HTTPS で取得します。
+`it930x-firmware.bin` はイメージに同梱しません。px4-userland 対応機種を検出した起動で
+有効なキャッシュがない場合、アドオンは PLEX の Web サイトから公式ドライバZIPを HTTPS で取得します。
 固定マニフェストにより、ZIP（サイズ/SHA-256）、ZIP内の完全一致するSYSエントリ
 （サイズ/SHA-256）、`fwtool` の出力（ファイル名/サイズ/SHA-256）を順番に検証します。
 ZIP内のディレクトリを展開せず、完全一致したSYSエントリだけを一時ファイルへストリームし、
@@ -48,7 +67,7 @@ ZIP内のディレクトリを展開せず、完全一致したSYSエントリ�
 ```
 
 有効なキャッシュはオフラインで再利用します。PLEX サイトに到達できない場合や検証に失敗した場合、
-既存キャッシュを上書きせず、PX-Q3U4 を無効化して PX-S1UD だけで起動を続けます。
+既存キャッシュを上書きせず、px4 を無効化して PX-S1UD だけで起動を続けます。
 公式ZIP、SYS、生成ファームウェアはいずれもリポジトリとアドオンイメージへ含めません。
 
 生成には [nns779/px4_drv](https://github.com/nns779/px4_drv) v0.2.1
@@ -66,11 +85,12 @@ Ingress はありません。画面は EPGStation アドオンです。
 ## 上流との違い
 
 - **siano-ts を同梱**し、`/dev/bus/usb` から libusb で PX-S1UD を開きます
-- **px4-userland を同梱**し、Q3U4 の8受信系とカード経路をユーザ空間で開きます
-- Q3U4 検出時だけ、PLEX 配布物からファームウェアを検証付きで生成・永続キャッシュします
+- **px4-userland を同梱**し、対応機種の受信系とカード経路をユーザ空間で開きます
+- px4-userland 対応機種の検出時だけ、PLEX 配布物からファームウェアを検証付きで生成・永続キャッシュします
 - **recisdb decode** を tuner command の後ろに置き、B-CAS で解いた TS を mirakc へ渡します
 - **pcscd** を起動時に起こします
 - 録画機能は使いません。EPG キャッシュは `/data/epg` に残します
 
 amd64 で、PX-Q3U4 の地デジ・BS/CS受信、B-CAS復号、8受信系の列挙・割当、
 地デジ4系統同時受信、BS/CS 4系統同時受信、終了処理、および PX-S1UD 2台との併用を確認済みです。
+Q3U4 以外の15機種は実機が無いため、検出・設定生成のコード検証のみです。
