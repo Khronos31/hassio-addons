@@ -17,8 +17,11 @@ EPGStation の `config.yml` を直接編集します。置き場所は
 /addon_configs/<リポジトリID>_epgstation/config.yml
 ```
 
-初回起動時にテンプレートから作られるので、`mirakurunPath` を自分の mirakc / Mirakurun へ
-向けてください。書式と全キーの説明は
+初回起動時にテンプレートから作られ、`mirakurunPath` は兄弟の mirakc アドオンへ
+自動で向きます（このアドオンが `local-epgstation` なら `http://local-mirakc:40772/`、
+リポジトリから入れた `<リポジトリID>-epgstation` なら
+`http://<リポジトリID>-mirakc:40772/`）。別の場所の mirakc / Mirakurun を使うときは
+この行を書き換えてください。書式と全キーの説明は
 [上流のマニュアル](https://github.com/l3tnun/EPGStation/blob/master/doc/conf-manual.md)
 がそのまま使えます。
 

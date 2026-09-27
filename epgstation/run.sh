@@ -13,6 +13,14 @@
 #    アドオンを再起動すれば直る。
 set -eu
 
+# 自分のホスト名 local-epgstation / <リポジトリID>-epgstation から、
+# 同じ置き方の mirakc アドオンのホスト名を決める。
+self_host=$(hostname)
+case "$self_host" in
+    *-epgstation) mirakc_host=${self_host%-epgstation}-mirakc ;;
+    *) mirakc_host=mirakc ;;
+esac
+
 USER_CFG=/config/config.yml        # addon_config マウント。設定の正本
 APP_CFG=/app/config/config.yml     # 上流がハードコードしている読み込み先
 RECORDED_AUDIO_PROFILE_AWK=/app/config/recorded-audio-profile.awk
@@ -45,10 +53,11 @@ if [ ! -f "$USER_CFG" ]; then
 #   https://github.com/l3tnun/EPGStation/blob/v2.10.0/doc/conf-manual.md
 #
 # port / clientSocketioPort / subDirectory はアドオンが起動のたびに固定します。
-# mirakurunPath を自分の mirakc / Mirakurun へ向けてください。
+# mirakurunPath は初回起動時に兄弟の mirakc アドオンへ向けて自動で設定します。
 HEADER
         sed -e "s|%ROOT%/recorded|/media/EPGStation|g" \
             -e "s|%ROOT%/thumbnail|/data/thumbnail|g" \
+            -e "s|^mirakurunPath:.*|mirakurunPath: http://${mirakc_host}:40772/|" \
             /app/config/config.yml.template
     } > "$USER_CFG"
     "$OPTIONAL_RECORDED_AUDIO_PROFILE_MIGRATION" "$RECORDED_AUDIO_PROFILE_MIGRATOR" --new "$USER_CFG" \
