@@ -1,14 +1,14 @@
 name: denpa
-version: "0.1.0"
+version: "0.2.0"
 slug: denpa
-description: "danything/denpa 1.22.1。PX-Q3U4 は同梱の px4-userland で開く。EDCB や mirakc と同時に USB は開かない。"
+description: "danything/denpa 1.24.0。PX-Q3U4 は同梱の px4-userland で開く。初回起動時に BS/CS の標準チャンネル一覧をシード。EDCB や mirakc と同時に USB は開かない。"
 url: https://github.com/danything/denpa
 arch:
   - amd64
 usb: true
 udev: true
 init: false
-# px4-ts の読み口を 8MB まで広げる。無いと 64KB のまま詰まり、ライブが SLOW_CONSUMER で切れる。
+# TS の読み口 (pipe) を 8MB まで広げる。無いと 64KB のまま詰まり、ライブが SLOW_CONSUMER で切れる。
 privileged:
   - SYS_RESOURCE
 startup: application
