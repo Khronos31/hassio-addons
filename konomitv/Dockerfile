@@ -42,7 +42,8 @@ RUN set -eux; \
 COPY config.default.yaml /code/config.default.yaml
 COPY run.sh /run.sh
 COPY ingress_proxy.py /ingress_proxy.py
-RUN chmod 755 /run.sh /ingress_proxy.py
+COPY audio_sidecar.py /audio_sidecar.py
+RUN chmod 755 /run.sh /ingress_proxy.py /audio_sidecar.py
 
 WORKDIR /code/server
 ENTRYPOINT []

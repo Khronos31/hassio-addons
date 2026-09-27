@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.1.2
+
+- 音声だけ配信サイドカー（`audio_sidecar.py`）を追加。7002/tcp で録画・ライブの MP3 ストリームを配信（Home Assistant Media Source 用）
+- 同梱 FFmpeg（`/code/server/thirdparty/FFmpeg/ffmpeg.elf`）で変換する。KonomiTV 本体は無改修
+
 ## 0.14.1.1
 
 - バージョン表記を「上流バージョン + アドオン改訂」（`0.14.1.1`）に変更

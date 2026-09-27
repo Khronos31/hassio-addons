@@ -1,5 +1,5 @@
 name: KonomiTV
-version: "0.14.1.1"
+version: "0.14.1.2"
 slug: konomitv
 description: "KonomiTV 0.14.1。番組表・予約・放送波は EDCB。録画先は /media 以下を設定ファイルで指定する。"
 url: https://github.com/Khronos31/hassio-addons/tree/main/konomitv
@@ -20,8 +20,10 @@ map:
 # LAN から直接 KonomiTV を見るとき用。要らなければ構成タブで空欄にすれば閉じられる。
 ports:
   7000/tcp: 7000
+  7002/tcp: 7002
 ports_description:
   7000/tcp: "KonomiTV サーバー（LAN からの直接視聴用）"
+  7002/tcp: "音声だけ配信サイドカー（Home Assistant Media Source 用）"
 # 画面は Ingress と公開ポートの両方。7000 番はサーバー本体の待ち受け。
 ingress: true
 ingress_port: 7011

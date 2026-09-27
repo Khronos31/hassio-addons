@@ -47,5 +47,9 @@ PY=/code/server/.venv/bin/python
 "$PY" /ingress_proxy.py --patch-assets /code/client/dist
 setsid "$PY" /ingress_proxy.py >> /config/ingress-proxy.log 2>&1 < /dev/null &
 
+# Home Assistant Media Source 向けに音声だけを配信するサイドカー。
+# KonomiTV 本体には手を入れず、同梱 FFmpeg で録画/ライブを MP3 へ変換して 7002 で流す。
+setsid "$PY" /audio_sidecar.py >> /config/audio-sidecar.log 2>&1 < /dev/null &
+
 cd /code/server
 exec "$PY" KonomiTV.py

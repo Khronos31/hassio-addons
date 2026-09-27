@@ -29,3 +29,16 @@
 
 Docker の中だと、書いたパスの先頭に `/host-rootfs` が付きます。`/host-rootfs` はコンテナ自身への
 リンクなので、`/media/DTV/EDCB` とそのまま同じ場所です。
+
+## 音声だけ配信（7002/tcp）
+
+Home Assistant の Media Source から「音声だけ」で再生するためのサイドカーが動いています。
+KonomiTV 本体は無改修で、同梱 FFmpeg が録画ファイル / ライブストリームを MP3 に変換して流します。
+
+- `GET http://<このアドオンのホスト>:7002/api/recorded/{録画ID}/audio.mp3`
+- `GET http://<このアドオンのホスト>:7002/api/streams/live/{チャンネルID}/audio.mp3?quality=720p`
+- 状態確認: `GET /healthz` → `ok`
+
+録画IDは KonomiTV の録画番組 API（`/api/videos`）の `id` です。チャンネルIDは `gr011` のような
+表示用チャンネル ID です。ログは `/config/audio-sidecar.log` に書かれます。
+
