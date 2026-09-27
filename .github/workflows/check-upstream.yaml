@@ -1,22 +1,32 @@
-name: Check upstream releases
+name: upstream-check
 
 on:
   schedule:
-    # 毎日 14:23 JST（05:23 UTC）。上流リリースの取りこぼしを防ぐため。
-    - cron: "23 5 * * *"
+    # 毎日 13:23 JST（04:23 UTC）
+    - cron: "23 4 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
   issues: write
 
+concurrency:
+  group: upstream-check
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Check upstream releases and create issues
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check upstream releases
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 .github/scripts/check-upstream.py

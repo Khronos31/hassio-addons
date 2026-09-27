@@ -1,123 +1,173 @@
 #!/usr/bin/env python3
-"""Check upstream releases and create an issue when a newer version exists.
+"""Compare bundled upstream versions with upstream releases; open Issues when newer.
 
-Runs on a schedule in GitHub Actions.  Reads `.github/upstreams.json` for the
-per-addon upstream definitions and compares each upstream version with the
-`version` field in `<addon>/config.yaml` (format: `<upstream>.<addon-revision>`).
-Creates one issue per addon when the upstream has moved on.
+The layout differs from Mayflower (addons instead of packages), but the logic
+follows tools/upstream-watch/check.py in Khronos31/Mayflower:
 
-Issue dedupe: an open issue labelled `upstream-update` whose title starts with
-`[upstream] <addon>:` suppresses a new issue for that addon.
+* gather only non-draft, non-prerelease releases/tags and take the max version
+* skip prerelease-looking tags (rc / alpha / beta / preview / pre / dev)
+* dedupe Issues by an HTML marker stored in the Issue body
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
+import subprocess
 import sys
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-MANIFEST = REPO_ROOT / ".github" / "upstreams.json"
+ROOT = Path(__file__).resolve().parent.parent.parent
+MANIFEST = ROOT / ".github" / "upstreams.json"
 LABEL = "upstream-update"
-ISSUE_TITLE_PREFIX = "[upstream]"
-
-TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY", "Khronos31/hassio-addons")
-GITHUB_API = os.environ.get("GITHUB_API_URL", "https://api.github.com")
-
+REPO = "Khronos31/hassio-addons"
+MARKER_TMPL = "<!-- upstream-check:addon={addon}:ver={ver} -->"
 JST = timezone(timedelta(hours=9))
 
 
-def api(path: str) -> dict | list:
-    url = f"{GITHUB_API}{path}"
-    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
-    if TOKEN:
-        req.add_header("Authorization", f"Bearer {TOKEN}")
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+def run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, text=True, capture_output=True, check=False)
 
 
-def current_upstream(addon: str, parts: int) -> tuple[int, ...]:
-    config = REPO_ROOT / addon / "config.yaml"
-    text = config.read_text(encoding="utf-8")
-    match = re.search(r'^version:\s*"([^"]+)"', text, flags=re.MULTILINE)
-    if not match:
-        raise RuntimeError(f"{addon}/config.yaml: version not found")
-    version = match.group(1)
-    nums = tuple(int(n) for n in re.findall(r"\d+", version))
-    if len(nums) < parts:
-        raise RuntimeError(f"{addon}: version {version!r} has fewer than {parts} parts")
-    return nums[:parts]
+def is_prerelease(ver: str) -> bool:
+    return bool(
+        re.search(r"(?i)(?:rc|alpha|beta|preview|pre|dev)\d*", ver)
+        or re.search(r"(?i)\d(?:a|b)\d+$", ver)
+    )
 
 
-def latest_upstream(entry: dict) -> str:
+def parse_version_parts(v: str) -> tuple:
+    v = v.strip().lstrip("v")
+    parts = re.split(r"[.\-+_]", v)
+    out = []
+    for part in parts:
+        if part.isdigit():
+            out.append((0, int(part)))
+            continue
+        match = re.match(r"(\d+)([A-Za-z].*)?$", part)
+        if match:
+            out.append((0, int(match.group(1))))
+            if match.group(2):
+                out.append((1, match.group(2)))
+        else:
+            out.append((1, part))
+    return tuple(out)
+
+
+def name_to_ver(name: str, strip: str) -> str | None:
+    ver = name.strip()
+    if strip and ver.startswith(strip):
+        ver = ver[len(strip):]
+    if is_prerelease(ver):
+        return None
+    # Must look like a version (reject debug_release / wincolor-0.1.6 etc.)
+    if not re.fullmatch(r"\d+(?:\.\d+)+(?:[A-Za-z]+\d*)?", ver):
+        return None
+    return ver
+
+
+def latest_upstream(entry: dict) -> str | None:
     repo = entry["repo"]
     source = entry["source"]
+    candidates: list[str] = []
+
     if source == "release":
-        data = api(f"/repos/{repo}/releases/latest")
-        tag = str(data.get("tag_name", ""))
+        cp = run([
+            "gh", "api", f"repos/{repo}/releases?per_page=40", "--jq",
+            ".[] | select(.draft==false and .prerelease==false) | .tag_name",
+        ])
+        if cp.returncode == 0:
+            for name in cp.stdout.splitlines():
+                ver = name_to_ver(name, entry.get("strip", "v"))
+                if ver:
+                    candidates.append(ver)
     elif source == "tag":
-        data = api(f"/repos/{repo}/tags?per_page=1")
-        tag = str(data[0]["name"])
+        cp = run(["gh", "api", f"repos/{repo}/tags?per_page=100", "--jq", ".[].name"])
+        if cp.returncode == 0:
+            for name in cp.stdout.splitlines():
+                ver = name_to_ver(name, entry.get("strip", ""))
+                if ver:
+                    candidates.append(ver)
     elif source == "branch":
         branch = entry["branch"]
-        data = api(f"/repos/{repo}/branches/{branch}")
-        sha = str(data["commit"]["sha"])
-        commit = api(f"/repos/{repo}/commits/{sha}")
-        iso = str(commit["commit"]["committer"]["date"])
+        cp = run(["gh", "api", f"repos/{repo}/branches/{branch}", "--jq", ".commit.sha"])
+        sha = cp.stdout.strip()
+        if cp.returncode != 0 or not sha:
+            return None
+        cp = run(["gh", "api", f"repos/{repo}/commits/{sha}", "--jq", ".commit.committer.date"])
+        iso = cp.stdout.strip()
+        if cp.returncode != 0 or not iso:
+            return None
         dt = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(JST)
         return dt.strftime("%y%m%d")
     else:
-        raise RuntimeError(f"unknown source: {source}")
+        print(f"unknown source: {source}", file=sys.stderr)
+        return None
 
-    strip = entry.get("strip", "")
-    if strip and tag.startswith(strip):
-        tag = tag[len(strip):]
-    return tag
-
-
-def version_tuple(version: str) -> tuple[int, ...]:
-    nums = tuple(int(n) for n in re.findall(r"\d+", version))
-    if not nums:
-        raise RuntimeError(f"version {version!r} has no numeric parts")
-    return nums
+    if not candidates:
+        print(f"warn: {repo}: no matching stable release/tag", file=sys.stderr)
+        return None
+    return max(candidates, key=parse_version_parts)
 
 
-def find_open_issue(addon: str) -> bool:
-    data = api(f"/repos/{GITHUB_REPOSITORY}/issues?labels={LABEL}&state=open&per_page=100")
-    prefix = f"{ISSUE_TITLE_PREFIX} {addon}:"
-    return any(str(issue.get("title", "")).startswith(prefix) for issue in data)
+def current_upstream(addon: str, parts: int) -> str:
+    config = ROOT / addon / "config.yaml"
+    match = re.search(
+        r'^version:\s*"([^"]+)"', config.read_text(encoding="utf-8"), flags=re.MULTILINE
+    )
+    if not match:
+        raise RuntimeError(f"{addon}/config.yaml: version not found")
+    version = match.group(1)
+    nums = re.findall(r"\d+", version)
+    if len(nums) < parts:
+        raise RuntimeError(f"{addon}: version {version!r} has fewer than {parts} parts")
+    return ".".join(nums[:parts])
+
+
+def is_newer(upstream: str, current: str) -> bool:
+    try:
+        return parse_version_parts(upstream) > parse_version_parts(current)
+    except Exception:
+        return upstream != current
+
+
+def find_existing_issue(addon: str, ver: str) -> int | None:
+    marker = MARKER_TMPL.format(addon=addon, ver=ver)
+    cp = run([
+        "gh", "issue", "list", "--repo", REPO, "--state", "all",
+        "--search", f"upstream-check {addon} in:body",
+        "--json", "number,title,body", "--limit", "50",
+    ])
+    if cp.returncode != 0:
+        print(f"warn: issue list failed: {cp.stderr.strip()}", file=sys.stderr)
+        return None
+    for issue in json.loads(cp.stdout or "[]"):
+        if marker in (issue.get("body") or ""):
+            return issue["number"]
+    return None
 
 
 def create_issue(addon: str, repo: str, current: str, latest: str) -> None:
-    title = f"{ISSUE_TITLE_PREFIX} {addon}: {repo} {latest}"
+    title = f"[upstream] {addon}: {repo} {latest}"
+    marker = MARKER_TMPL.format(addon=addon, ver=latest)
     body = (
         f"上流 {repo} が {latest} をリリースしました。\n\n"
         f"- 現在の同梱: {current}\n"
         f"- 新しい同梱: {latest}\n\n"
         "対応: Dockerfile の同梱バージョンを更新し、"
         "`<addon>/config.yaml` の `version` を `<上流>.<改訂>` 形式で更新してください。\n"
-        "コード変更が必要な場合は別途検討してください。"
+        "コード変更が必要な場合は別途検討してください。\n\n"
+        f"{marker}"
     )
-    payload = json.dumps({"title": title, "body": body, "labels": [LABEL]}).encode("utf-8")
-    req = urllib.request.Request(
-        f"{GITHUB_API}/repos/{GITHUB_REPOSITORY}/issues",
-        data=payload,
-        method="POST",
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {TOKEN}",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        issue = json.loads(resp.read().decode("utf-8"))
-    print(f"created issue #{issue['number']}: {title}")
+    cp = run([
+        "gh", "issue", "create", "--repo", REPO,
+        "--title", title, "--body", body, "--label", LABEL,
+    ])
+    if cp.returncode != 0:
+        print(f"warn: issue create failed: {cp.stderr.strip()}", file=sys.stderr)
+        return
+    print(f"created issue: {cp.stdout.strip()}")
 
 
 def main() -> int:
@@ -127,17 +177,16 @@ def main() -> int:
         try:
             parts = int(entry["parts"])
             current = current_upstream(addon, parts)
-            latest_str = latest_upstream(entry)
-            latest = version_tuple(latest_str)
-            print(f"{addon}: current={'.'.join(map(str, current))} latest={latest_str}")
-            if latest > current:
-                if find_open_issue(addon):
-                    print(f"{addon}: open issue already exists, skip")
+            latest = latest_upstream(entry)
+            if latest is None:
+                failed = True
+                continue
+            print(f"{addon}: current={current} latest={latest}")
+            if is_newer(latest, current):
+                if find_existing_issue(addon, latest) is not None:
+                    print(f"{addon}: issue for {latest} already exists, skip")
                     continue
-                create_issue(addon, entry["repo"], ".".join(map(str, current)), latest_str)
-        except urllib.error.HTTPError as exc:
-            print(f"{addon}: HTTP {exc.code} {exc.reason}", file=sys.stderr)
-            failed = True
+                create_issue(addon, entry["repo"], current, latest)
         except Exception as exc:  # noqa: BLE001 - keep the workflow going
             print(f"{addon}: {exc}", file=sys.stderr)
             failed = True
