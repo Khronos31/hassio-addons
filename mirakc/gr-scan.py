@@ -20,7 +20,7 @@ import sys
 import time
 
 DEFAULT_CHANNELS = [f"T{n}" for n in range(13, 63)]
-CAPTURE_SECONDS = 8.0
+CAPTURE_SECONDS = 6.0
 
 # モデルごとの最初の地上波受信機番号
 PX4_GR_RECEIVER = {

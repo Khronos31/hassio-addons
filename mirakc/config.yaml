@@ -10,7 +10,7 @@ arch:
 init: false
 startup: application
 boot: auto
-timeout: 900
+timeout: 300
 usb: true
 udev: true
 realtime: true
