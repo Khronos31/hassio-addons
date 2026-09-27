@@ -1,0 +1,32 @@
+{
+  "denpa": {
+    "repo": "danything/denpa",
+    "source": "release",
+    "strip": "v",
+    "parts": 3
+  },
+  "mirakc": {
+    "repo": "mirakc/mirakc",
+    "source": "tag",
+    "strip": "",
+    "parts": 3
+  },
+  "epgstation": {
+    "repo": "l3tnun/EPGStation",
+    "source": "tag",
+    "strip": "v",
+    "parts": 3
+  },
+  "konomitv": {
+    "repo": "tsukumijima/KonomiTV",
+    "source": "release",
+    "strip": "v",
+    "parts": 3
+  },
+  "edcb": {
+    "repo": "xtne6f/EDCB",
+    "source": "branch",
+    "branch": "work-plus-s",
+    "parts": 1
+  }
+}

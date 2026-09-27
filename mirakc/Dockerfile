@@ -2,7 +2,7 @@
 # The Q3U4 vendor archive is never included.  At runtime a pinned GPL fwtool
 # derives the firmware into the persistent add-on config volume after every
 # input and output has passed the pinned size/SHA-256 manifest.
-FROM docker.io/mirakc/mirakc:3.4.82-debian@sha256:26af4e0bdec9b0ef1e967c008cc5884b9daf978a3f556d7d3d19efcba4f4c140
+FROM docker.io/mirakc/mirakc:3.4.87-debian@sha256:aefb82fafa144e0f4878075dab101852f9b4c374ad0dc52fe8594368ddc15d5c
 
 USER root
 

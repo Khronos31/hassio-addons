@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.1.1
+
+- バージョン表記を「上流バージョン + アドオン改訂」（`0.14.1.1`）に変更
+- コード変更なし。同梱の KonomiTV は 0.14.1（最新）のまま
+
 ## 0.1.2
 
 - `recorded_folders` の初期値を `/media/DTV/EDCB` と `/media/DTV/KonomiTV-Capture` に変更

@@ -1,0 +1,22 @@
+name: Check upstream releases
+
+on:
+  schedule:
+    # 毎日 14:23 JST（05:23 UTC）。上流リリースの取りこぼしを防ぐため。
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check upstream releases and create issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/check-upstream.py
