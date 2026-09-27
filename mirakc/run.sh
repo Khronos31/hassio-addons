@@ -568,7 +568,7 @@ fi
 # 初回起動時、地上波チャンネルを実測して GR 一覧を差し替える。
 scan_gr_channels()
 {
-    echo "地上波チャンネルをスキャンします（数分かかります）。" >&2
+    echo "地上波チャンネルをスキャンします（10分ほどかかります）。" >&2
     if python3 /usr/local/bin/gr-scan.py "$@" --replace-config "$USER_CFG"; then
         echo "地上波チャンネルを走査結果で更新しました。" >&2
     else
