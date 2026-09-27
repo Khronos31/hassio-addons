@@ -515,10 +515,12 @@ if ! chmod 0700 "$PX4_RUNTIME_DIR"; then
     exit 1
 fi
 
+first_boot=0
 if [ ! -f "$USER_CFG" ]; then
     echo "config.yml がないのでテンプレートから作ります: ${USER_CFG}" >&2
     mkdir -p "$(dirname "$USER_CFG")"
     cp "$TEMPLATE" "$USER_CFG"
+    first_boot=1
 fi
 
 if [ ! -r "$SIANO_FIRMWARE" ]; then
@@ -563,6 +565,25 @@ echo "Siano firmware: ${SIANO_FIRMWARE}" >&2
 if ! collect_siano_list; then
     exit 1
 fi
+# 初回起動時、地上波チャンネルを実測して GR 一覧を差し替える。
+scan_gr_channels()
+{
+    echo "地上波チャンネルをスキャンします（数分かかります）。" >&2
+    if python3 /usr/local/bin/gr-scan.py "$@" --replace-config "$USER_CFG"; then
+        echo "地上波チャンネルを走査結果で更新しました。" >&2
+    else
+        echo "地上波スキャンに失敗したため、テンプレートの関東チャンネルのまま続行します。" >&2
+    fi
+}
+
+if [ "$first_boot" -eq 1 ]; then
+    if [ -n "$PX4_DEVICE" ] && [ -n "$px4_model" ]; then
+        scan_gr_channels --px4-bin /usr/local/bin/px4-ts-stream --px4-model "$px4_model"
+    elif [ -s "$tmp_dir/siano-list.txt" ]; then
+        scan_gr_channels --siano-bin /usr/local/bin/px-s1ud-stream --siano-adapter 0
+    fi
+fi
+
 if ! generate_effective_config; then
     echo "mirakc effective config generation failed" >&2
     exit 1
