@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- mirakurunPath を `.local.hass.io` 名（IPv4 のみ）に修正。短いホスト名は IPv6 を先に返すため、
+  Node.js の EPGStation が mirakc へ接続できず「check mirakurun」が無限ループする問題を修正
+- 末尾スラッシュを除去（mirakurun ライブラリが `//api/...` を発行して 404 になるため）
+
 ## 0.2.1
 
 - `mirakurunPath` を初回起動時に兄弟の mirakc アドオンへ自動設定（ホスト名導出）

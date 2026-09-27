@@ -54,10 +54,11 @@ if [ ! -f "$USER_CFG" ]; then
 #
 # port / clientSocketioPort / subDirectory はアドオンが起動のたびに固定します。
 # mirakurunPath は初回起動時に兄弟の mirakc アドオンへ向けて自動で設定します。
+# .local.hass.io 名は IPv4 だけを返すため、Node.js の IPv6 優先解決を避けられます。
 HEADER
         sed -e "s|%ROOT%/recorded|/media/EPGStation|g" \
             -e "s|%ROOT%/thumbnail|/data/thumbnail|g" \
-            -e "s|^mirakurunPath:.*|mirakurunPath: http://${mirakc_host}:40772/|" \
+            -e "s|^mirakurunPath:.*|mirakurunPath: http://${mirakc_host}.local.hass.io:40772|" \
             /app/config/config.yml.template
     } > "$USER_CFG"
     "$OPTIONAL_RECORDED_AUDIO_PROFILE_MIGRATION" "$RECORDED_AUDIO_PROFILE_MIGRATOR" --new "$USER_CFG" \
