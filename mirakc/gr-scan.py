@@ -59,21 +59,15 @@ def scan_channel(args, channel: str) -> list:
     # stdin からテーブルを拾えない環境があるため。
     data = bytearray()
     deadline = time.monotonic() + args.capture_seconds
-    last_data = time.monotonic()
     try:
         while time.monotonic() < deadline and len(data) < 12 * 1024 * 1024:
             ready, _, _ = select.select([stream.stdout], [], [], 0.5)
             if not ready:
-                # 4秒間データが来なければ空きチャンネルとみなして打ち切る。
-                # px4-ts は同調失敗で約10秒待つため、これを待たずに次へ進む。
-                if time.monotonic() - last_data > 4.0:
-                    break
                 continue
             chunk = stream.stdout.read(188 * 1024)
             if not chunk:
                 break
             data.extend(chunk)
-            last_data = time.monotonic()
             if stream.poll() is not None and data:
                 break
     except Exception as exc:
