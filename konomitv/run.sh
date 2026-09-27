@@ -41,7 +41,7 @@ case "$edcb_from_config" in
         ;;
 esac
 
-mkdir -p /media/EDCB /media/KonomiTV-Capture
+mkdir -p /media/DTV/EDCB /media/DTV/KonomiTV-Capture
 
 PY=/code/server/.venv/bin/python
 "$PY" /ingress_proxy.py --patch-assets /code/client/dist

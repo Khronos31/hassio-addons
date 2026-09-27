@@ -56,7 +56,7 @@ if [ ! -f "$USER_CFG" ]; then
 # mirakurunPath は初回起動時に兄弟の mirakc アドオンへ向けて自動で設定します。
 # .local.hass.io 名は IPv4 だけを返すため、Node.js の IPv6 優先解決を避けられます。
 HEADER
-        sed -e "s|%ROOT%/recorded|/media/EPGStation|g" \
+        sed -e "s|%ROOT%/recorded|/media/DTV/EPGStation|g" \
             -e "s|%ROOT%/thumbnail|/data/thumbnail|g" \
             -e "s|^mirakurunPath:.*|mirakurunPath: http://${mirakc_host}.local.hass.io:40772|" \
             /app/config/config.yml.template

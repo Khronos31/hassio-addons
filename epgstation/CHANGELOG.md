@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- 録画先の初期値を `/media/DTV/EPGStation` に変更
+
 ## 0.2.2
 
 - mirakurunPath を `.local.hass.io` 名（IPv4 のみ）に修正。短いホスト名は IPv6 を先に返すため、

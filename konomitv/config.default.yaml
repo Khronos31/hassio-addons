@@ -26,9 +26,9 @@ tv:
 video:
   # ディレクトリ名はここを書き換える。/media は読み書きでマウントしてある。
   recorded_folders:
-    - /media/EDCB
+    - /media/DTV/EDCB
   exclude_scan_paths: []
 
 capture:
   upload_folders:
-    - /media/KonomiTV-Capture
+    - /media/DTV/KonomiTV-Capture

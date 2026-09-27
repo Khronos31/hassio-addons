@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8
+
+- 録画先を `/media/DTV/EDCB` に変更（全アドオンの既定を `/media/DTV/` 配下へ統一）
+
 ## 0.1.7
 
 - Q3U4 系の内蔵カードスロットを pcscd に登録（recisdb の B-CAS 復号が動くように）

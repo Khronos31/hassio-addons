@@ -76,7 +76,7 @@ if [ -n "$MIRAKC_URL" ]; then
     esac
 fi
 
-mkdir -p "$CFG" /media/EDCB "$LIB" /run/edcb-s1ud /run/edcb-px4 /run/px4-userland
+mkdir -p "$CFG" /media/DTV/EDCB "$LIB" /run/edcb-s1ud /run/edcb-px4 /run/px4-userland
 # px4d はランタイムディレクトリが 0700 であることを要求する (validate_directory)。
 chmod 0700 /run/px4-userland
 if [ ! -f "$CFG/EpgTimerSrv.ini" ]; then
@@ -141,7 +141,7 @@ EOF
         cat > "$CFG/Common.ini" << 'EOF'
 [SET]
 RecFolderNum=1
-RecFolderPath0=/media/EDCB
+RecFolderPath0=/media/DTV/EDCB
 EOF
     fi
 fi

@@ -25,7 +25,7 @@
 ## 録画ファイル
 
 `/media` は読み書きで入っています。どのディレクトリに置くかは `config.yaml` の
-`video.recorded_folders` です。初期値は `/media/EDCB` です。
+`video.recorded_folders` です。初期値は `/media/DTV/EDCB` です。
 
 Docker の中だと、書いたパスの先頭に `/host-rootfs` が付きます。`/host-rootfs` はコンテナ自身への
-リンクなので、`/media/EDCB` とそのまま同じ場所です。
+リンクなので、`/media/DTV/EDCB` とそのまま同じ場所です。

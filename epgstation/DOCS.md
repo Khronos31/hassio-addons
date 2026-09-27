@@ -36,7 +36,7 @@ EPGStation の `config.yml` を直接編集します。置き場所は
 
 ### 置き場所
 
-録画先は `recorded` に書きます。複数指定できます。`/media` か `/share` の下にしてください。
+録画先は `recorded` に書きます。複数指定できます。初期値は `/media/DTV/EPGStation` です。追加する場合も `/media` か `/share` の下にしてください。
 データベースとサムネイルはアドオンの `/data` に置かれるので、更新しても残ります。
 `dropLog` や `recordedTmp` を使う場合も `/data` の下にすると更新後も残ります。
 

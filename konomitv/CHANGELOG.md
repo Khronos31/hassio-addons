@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- `recorded_folders` の初期値を `/media/DTV/EDCB` と `/media/DTV/KonomiTV-Capture` に変更
+
 ## 0.1.1
 
 - 7000/tcp を公開（LAN から直接 KonomiTV を開ける）
