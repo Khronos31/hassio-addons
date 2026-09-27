@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.6
+
+- BS/CS の標準チャンネル一覧をシードとして同梱（BS 26 + CS 12。EDCB のスキャン結果から生成）
+- 従来は NHK BS とショップチャンネルのみだった BS/CS チャンネルをフルリストに拡充
+
 ## 0.2.5
 
 - px4-userland 対応機種を全16モデルに拡充（Q3U4 / Q3PE4 / Q3PE5 / W3U4 / W3PE4 / W3PE5 / MLT5PE / MLT8PE3 / MLT8PE5 / DTV02A-5TS-P / DTV02A-4TS-P / M1UR / S1UR / DTV03A-1TU / DTV02-1T1S-U / DTV02A-1T1S-U）
