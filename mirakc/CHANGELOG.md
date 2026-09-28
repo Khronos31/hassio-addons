@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.4.87.2
+
+- PX4 非検出（S1UD のみ）の環境で `generate-effective-config.py` へ空の `--px4-model` を渡し、effective config の生成に失敗していた問題を修正（`--px4-model` は PX4 検出時のみ渡す）
+
 ## 3.4.87.1
 
 - バージョン表記を「上流バージョン + アドオン改訂」（`3.4.87.1`）に変更

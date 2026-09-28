@@ -457,13 +457,16 @@ generate_effective_config()
         echo "effective config helper is missing or unreadable: $EFFECTIVE_CONFIG_HELPER" >&2
         return 1
     fi
-    if ! python3 "$EFFECTIVE_CONFIG_HELPER" \
+    set -- \
         --input "$USER_CFG" \
         --output "$APP_CFG" \
         --siano-list "$tmp_dir/siano-list.txt" \
         --warmup-file "$tmp_dir/siano-warmup.txt" \
-        --q3u4-enabled "$q3u4_enabled" \
-        --px4-model "$px4_model"; then
+        --q3u4-enabled "$q3u4_enabled"
+    if [ -n "$px4_model" ]; then
+        set -- "$@" --px4-model "$px4_model"
+    fi
+    if ! python3 "$EFFECTIVE_CONFIG_HELPER" "$@"; then
         return 1
     fi
 }
