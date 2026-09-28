@@ -24,6 +24,7 @@ COPY recorded-audio-profile-ts.yml /app/config/recorded-audio-profile-ts.yml
 COPY recorded-audio-profile-encoded.yml /app/config/recorded-audio-profile-encoded.yml
 COPY recorded-audio-profile-mp3-ts.yml /app/config/recorded-audio-profile-mp3-ts.yml
 COPY recorded-audio-profile-mp3-encoded.yml /app/config/recorded-audio-profile-mp3-encoded.yml
+COPY live-audio-profile-mp3.yml /app/config/live-audio-profile-mp3.yml
 COPY migrate-recorded-audio-profile.sh /app/config/migrate-recorded-audio-profile.sh
 COPY run-optional-recorded-audio-migration.sh /app/config/run-optional-recorded-audio-migration.sh
 RUN chmod 755 /run.sh /app/config/migrate-recorded-audio-profile.sh \

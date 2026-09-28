@@ -78,15 +78,84 @@ function flush_target() {
     mp3_count = 0
 }
 
+function flush_live_target(line, added_lines) {
+    if (!live_target) {
+        return
+    }
+    if (live_mp3_profile_file != "") {
+        if (live_profile_count > 1) {
+            print "live-audio-profile: duplicate Home Assistant Live Audio MP3 in stream.live.ts.mp4" > "/dev/stderr"
+            invalid = 1
+        } else if (live_profile_count == 0 && !validate_only) {
+            added_lines = 0
+            while ((getline line < live_mp3_profile_file) > 0) {
+                print line
+                added_lines++
+            }
+            close(live_mp3_profile_file)
+            if (added_lines == 0) {
+                print "live-audio-profile: profile fragment is empty: " live_mp3_profile_file > "/dev/stderr"
+                invalid = 1
+            }
+            live_profile_count = 1
+        }
+        if (validate_only && live_profile_count != 1) {
+            print "live-audio-profile: stream.live.ts.mp4 must contain exactly one Home Assistant Live Audio MP3 profile" > "/dev/stderr"
+            invalid = 1
+        }
+    }
+    live_target = 0
+    live_profile_count = 0
+}
+
 /^stream:$/ {
+    flush_live_target()
     in_stream = 1
 }
 in_stream && /^[^[:space:]][^:]*:/ && $0 !~ /^stream:$/ {
+    flush_live_target()
     flush_target()
     in_stream = 0
+    in_live = 0
+    in_live_ts = 0
     in_recorded = 0
     section = ""
     target_section = ""
+}
+in_stream && /^    live:$/ {
+    flush_live_target()
+    in_live = 1
+    in_live_ts = 0
+    in_recorded = 0
+}
+in_stream && /^    recorded:$/ {
+    flush_live_target()
+    in_live = 0
+    in_live_ts = 0
+}
+in_live && /^        ts:$/ {
+    flush_live_target()
+    in_live_ts = 1
+}
+in_live_ts && /^        [^[:space:]][^:]*:/ && $0 !~ /^        ts:$/ {
+    flush_live_target()
+    in_live_ts = 0
+}
+in_live_ts && /^            mp4:$/ {
+    flush_live_target()
+    live_target = 1
+    live_profile_count = 0
+    live_mp4_count++
+}
+live_target && /^            [^[:space:]][^:]*:/ && $0 !~ /^            mp4:$/ {
+    flush_live_target()
+}
+live_target && /^                - name:/ {
+    if ($0 ~ /^                - name:[[:space:]]*Home Assistant Live Audio MP3([[:space:]]+#.*)?[[:space:]]*$/ ||
+        $0 ~ /^                - name:[[:space:]]*'Home Assistant Live Audio MP3'([[:space:]]+#.*)?[[:space:]]*$/ ||
+        $0 ~ /^                - name:[[:space:]]*"Home Assistant Live Audio MP3"([[:space:]]+#.*)?[[:space:]]*$/) {
+        live_profile_count++
+    }
 }
 in_stream && /^    recorded:$/ {
     in_recorded = 1
@@ -151,6 +220,7 @@ target_section != "" && /^            [^[:space:]][^:]*:/ && $0 !~ /^           
     print
 }
 END {
+    flush_live_target()
     flush_target()
     if (ts_mp4_count != 1) {
         print "recorded-audio-profile: stream.recorded.ts.mp4 is missing or duplicated" > "/dev/stderr"
@@ -158,6 +228,10 @@ END {
     }
     if (encoded_mp4_count != 1) {
         print "recorded-audio-profile: stream.recorded.encoded.mp4 is missing or duplicated" > "/dev/stderr"
+        invalid = 1
+    }
+    if (live_mp3_profile_file != "" && live_mp4_count != 1) {
+        print "live-audio-profile: stream.live.ts.mp4 is missing or duplicated" > "/dev/stderr"
         invalid = 1
     }
     if (invalid) {

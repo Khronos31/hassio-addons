@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.1.3
+
+- 7002/tcp に録画 HLS ファサード（`/api/recorded/{録画ID}/video.m3u8?quality=720p`）を追加。プレイリストとセグメントをサイドカー経由で配信し、上流セッションの Keep-Alive（約3秒間隔）と無通信約8秒後の解放を代行
+- 7002/tcp に録画一覧 API の透過プロキシ（`/api/videos`）とライブ映像（`/api/streams/live/{チャンネルID}/video.ts?quality=720p`）を追加
+- ライブ映像の raw TS が Cast で再生できなかったため、ライブ HLS（`/api/streams/live/{チャンネルID}/video.m3u8?quality=720p`）を追加。同梱 FFmpeg の stream copy で MPEG-TS セグメントを生成
+- サイドカーの上流 API 接続先を `http://127.0.0.77:7010` に修正（7000 は Akebi の HTTPS リダイレクトのため）
+
 ## 0.14.1.2
 
 - 音声だけ配信サイドカー（`audio_sidecar.py`）を追加。7002/tcp で録画・ライブの MP3 ストリームを配信（Home Assistant Media Source 用）

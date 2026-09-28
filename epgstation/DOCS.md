@@ -42,7 +42,7 @@ EPGStation の `config.yml` を直接編集します。置き場所は
 
 設定を壊すと EPGStation は起動しません。上流をそのまま使ったときと同じです。
 ファイルを消せばテンプレートから作り直されます。アドオン更新後の起動時には、既存の
-`config.yml` にも下記プロファイルを冪等に追記します。設定に問題がある場合は音声プロファイル移行で
+`config.yml` にも下記の録画・ライブ音声プロファイルを冪等に追記します。設定に問題がある場合は音声プロファイル移行で
 元ファイルを変更せず、移行をスキップします。移行がスキップされてもEPGStationの
 録画・通常起動は妨げませんが、Home Assistant向け音声プロファイルは利用できないため、
 ログの警告を確認して対応形式の設定へ手動追記してください。
@@ -116,6 +116,24 @@ stream:
 AACプロファイルの `-frag_duration 1000000` は 1 秒の短い fMP4 fragment を指定し、映像キーフレームに
 依存せず音声だけを連続出力します。MP3プロファイルは raw MP3 の連続出力なので、fMP4 fragment や
 `-frag_duration` は使いません。
+
+ライブ配信には `stream.live.ts.mp4` へ次のプロファイルが入ります。統合側は `/api/config`
+からこの名前の現在の mode index を取得し、`/api/streams/live/{channelId}/mp4?mode={index}`
+で配信を要求します。
+
+```yaml
+stream:
+    live:
+        ts:
+            mp4:
+                - name: Home Assistant Live Audio MP3
+                  cmd: >-
+                      %FFMPEG% -dual_mono_mode main -i pipe:0 -vn -sn -map 0:a:0?
+                      -c:a libmp3lame -ar 48000 -ac 2 -b:a 192k -f mp3 pipe:1
+```
+
+ライブも録画と同様、MP3データを `/mp4` API から返すため、HTTPヘッダーは
+`Content-Type: video/mp4` のままです。統合側ではレスポンスの実体を `audio/mpeg` として扱います。
 
 ## 開き方
 

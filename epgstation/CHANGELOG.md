@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.10.0.2
+
+- `stream.live.ts.mp4` へライブ音声プロファイル `Home Assistant Live Audio MP3` を追加（`/api/streams/live/{channelId}/mp4?mode=2` で MP3 / 48kHz / 2ch / 192kbps を配信）
+- 初回設定・既存設定の両方へ冪等追加。不正な設定は元ファイルを変更せず警告して起動を継続
+
 ## 2.10.0.1
 
 - バージョン表記を「上流バージョン + アドオン改訂」（`2.10.0.1`）に変更

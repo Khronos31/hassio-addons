@@ -42,3 +42,33 @@ KonomiTV 本体は無改修で、同梱 FFmpeg が録画ファイル / ライブ
 録画IDは KonomiTV の録画番組 API（`/api/videos`）の `id` です。チャンネルIDは `gr011` のような
 表示用チャンネル ID です。ログは `/config/audio-sidecar.log` に書かれます。
 
+## 録画映像配信（7002/tcp）
+
+Google Cast 向けに、録画の HLS プレイリストとセグメントをサイドカー経由で配信します。
+
+- `GET http://<このアドオンのホスト>:7002/api/recorded/{録画ID}/video.m3u8?quality=720p`
+- 対応品質: `720p`、`720p-hevc`
+- 録画 ID は KonomiTV の録画番組 API（`/api/videos`）の `id` です
+- HLS セグメント URL は再生ごとの不透明なセッショントークンを含み、同じ 7002 番ポートへ相対パスでアクセスします
+- KonomiTV の視聴セッションは再生アクセス中に約3秒間隔で Keep-Alive され、アクセスが約8秒途絶えると破棄されます
+- 未完了録画は `409`、存在しない ID またはファイルは `404`、KonomiTV 接続エラーは `502` を返します
+
+再生 URL には LAN から到達できるアドオンのホスト名または IP アドレスを指定してください。
+
+## KonomiTV 録画一覧・ライブ映像（7002/tcp）
+
+録画一覧 API はクエリを KonomiTV へ転送し、JSON をそのまま返します。
+
+- `GET http://<このアドオンのホスト>:7002/api/videos?order=desc&page=1&ids=1,2`
+- 上流へ接続できない場合は `502` を返します
+
+ライブ映像は KonomiTV の MPEG-TS をそのまま中継する経路と、同梱 FFmpeg で HLS に変換する経路があります。Google Cast 向けには HLS を使います。
+
+- `GET http://<このアドオンのホスト>:7002/api/streams/live/{チャンネルID}/video.ts?quality=720p`
+- `GET http://<このアドオンのホスト>:7002/api/streams/live/{チャンネルID}/video.m3u8?quality=720p`
+- 対応品質: `720p`、`720p-hevc`
+- TS の MIME は `video/mp2t`、HLS プレイリストの MIME は `application/vnd.apple.mpegurl` です。チャンネルが存在しない場合は `404`、不正な品質は `400`、上流へ接続できない場合は `502` を返します
+- HLS は再エンコードせず、FFmpeg の `-c copy` で約3秒の MPEG-TS セグメントを生成します。playlist の初回生成には最大60秒待ちます
+- HLS セッションはクライアント・チャンネル・品質ごとに分離され、playlist の再取得では既存セッションを再利用します。無通信が約8秒続くと FFmpeg と一時ファイルを解放し、セグメント配信中にクライアントが切断した場合も解放します
+
+Cast からアクセスする場合は、LAN から到達できるアドオンのホスト名または IP アドレスを指定してください。
