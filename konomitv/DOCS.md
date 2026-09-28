@@ -62,6 +62,12 @@ Google Cast 向けに、録画の HLS プレイリストとセグメントをサ
 - `GET http://<このアドオンのホスト>:7002/api/videos?order=desc&page=1&ids=1,2`
 - 上流へ接続できない場合は `502` を返します
 
+チャンネル一覧も 7002 から取得できます（クエリなしの GET のみ）。
+
+- `GET http://<このアドオンのホスト>:7002/api/channels`
+- KonomiTV 本体の応答（`GR` / `BS` / `CS` / `SKY` / `CATV` / `BS4K` の分類オブジェクト）を JSON のまま返します
+- 上流停止・タイムアウト・不正な応答は `502` を返します
+
 ライブ映像は KonomiTV の MPEG-TS をそのまま中継する経路と、同梱 FFmpeg で HLS に変換する経路があります。Google Cast 向けには HLS を使います。
 
 - `GET http://<このアドオンのホスト>:7002/api/streams/live/{チャンネルID}/video.ts?quality=720p`
