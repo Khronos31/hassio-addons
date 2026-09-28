@@ -19,4 +19,5 @@ https://github.com/Khronos31/hassio-addons
 | [EPGStation](epgstation) | Mirakurun を使用した録画管理ソフト |
 | [EDCB](edcb) | xtne6f 版 EDCB。siano-userland と px4-userland を同梱し、PX-S1UD は BonDriver_S1UD で開く |
 | [KonomiTV](konomitv) | KonomiTV。番組表・予約・放送波は EDCB |
+| [denpa](denpa) | danything/denpa。PX-Q3U4 は同梱の px4-userland で開く。初回起動時に BS/CS の標準チャンネル一覧をシード |
 | [Studio Code Server](scs-forge) | Home Assistant向けのブラウザー開発環境 |

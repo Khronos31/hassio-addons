@@ -504,6 +504,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.proxy_videos(parsed.query)
                 return
 
+            if path == "/api/channels":
+                if parsed.query:
+                    raise FacadeError(400, "query parameters are not allowed")
+                self.proxy_channels()
+                return
+
             live_video_match = re.fullmatch(
                 r"/api/streams/live/([^/]+)/video\.ts", path
             )
@@ -644,6 +650,37 @@ class Handler(BaseHTTPRequestHandler):
         with response:
             body = response.read()
             self.send_response(response.status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+    def proxy_channels(self) -> None:
+        """Pass the upstream channel list through.
+
+        Only a successful response whose body is a JSON object is treated as a
+        success.  Upstream failures, timeouts, and broken/non-JSON responses
+        become 502 so the integration can rely on this endpoint as an
+        availability check.
+        """
+        url = f"{KONOMI_API}/api/channels"
+        try:
+            response = urllib.request.urlopen(url, timeout=HTTP_TIMEOUT)
+        except urllib.error.HTTPError as exc:
+            raise FacadeError(502, "KonomiTV is unavailable") from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise FacadeError(502, "KonomiTV is unavailable") from exc
+
+        with response:
+            body = response.read()
+            try:
+                data = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise FacadeError(502, "invalid response from KonomiTV") from exc
+            if not isinstance(data, dict):
+                raise FacadeError(502, "invalid response from KonomiTV")
+            self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")

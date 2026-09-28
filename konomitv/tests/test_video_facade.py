@@ -26,10 +26,21 @@ class MockKonomiHandler(BaseHTTPRequestHandler):
     live_stream_closed: list[str] = []
     live_hls_upstream_closed: list[str] = []
     recorded_file = ""
+    channels_body = json.dumps({
+        "GR": [{"display_channel_id": "gr011", "name": "NHK総合"}],
+        "BS": [],
+        "CS": [],
+        "SKY": [],
+        "CATV": [],
+        "BS4K": [],
+    }).encode()
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urllib.parse.urlparse(self.path)
         query = urllib.parse.parse_qs(parsed.query)
+        if parsed.path == "/api/channels":
+            self._send(200, self.channels_body, "application/json")
+            return
         if parsed.path == "/api/videos":
             self.video_requests.append(self.path)
             if query.get("passthrough") == ["1"]:
@@ -195,6 +206,14 @@ if first:
         MockKonomiHandler.video_requests.clear()
         MockKonomiHandler.live_stream_closed.clear()
         MockKonomiHandler.live_hls_upstream_closed.clear()
+        MockKonomiHandler.channels_body = json.dumps({
+            "GR": [{"display_channel_id": "gr011", "name": "NHK総合"}],
+            "BS": [],
+            "CS": [],
+            "SKY": [],
+            "CATV": [],
+            "BS4K": [],
+        }).encode()
 
     def request(self, path: str, method: str = "GET") -> tuple[int, bytes, object]:
         req = urllib.request.Request(self.base_url + path, method=method)
@@ -305,6 +324,37 @@ if first:
             self.assertEqual(status, 502)
             self.assertEqual(headers.get_content_type(), "application/json")
             self.assertIn(b"unavailable", body)
+        finally:
+            sidecar.KONOMI_API = original_api
+
+    def test_channels_proxy_and_validation(self) -> None:
+        status, body, headers = self.request("/api/channels")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers.get_content_type(), "application/json")
+        self.assertEqual(headers.get("Access-Control-Allow-Origin"), "*")
+        data = json.loads(body)
+        self.assertEqual(data["GR"][0]["display_channel_id"], "gr011")
+        self.assertIn("BS4K", data)
+
+        # クエリ付きは許可しない
+        self.assertEqual(self.request("/api/channels?x=1")[0], 400)
+        # POST も許可しない（既定の 501）
+        self.assertEqual(self.request("/api/channels", method="POST")[0], 501)
+
+        # 非JSON・非オブジェクト応答は 502
+        for broken in (b"<html>oops</html>", b"[1,2,3]"):
+            MockKonomiHandler.channels_body = broken
+            status, body, headers = self.request("/api/channels")
+            self.assertEqual(status, 502)
+            self.assertEqual(headers.get_content_type(), "application/json")
+
+        # 上流停止は 502
+        original_api = sidecar.KONOMI_API
+        sidecar.KONOMI_API = "http://127.0.0.1:1"
+        try:
+            status, body, headers = self.request("/api/channels")
+            self.assertEqual(status, 502)
+            self.assertEqual(headers.get_content_type(), "application/json")
         finally:
             sidecar.KONOMI_API = original_api
 

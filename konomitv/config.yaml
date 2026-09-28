@@ -1,5 +1,5 @@
 name: KonomiTV
-version: "0.14.1.3"
+version: "0.14.1.4"
 slug: konomitv
 description: "KonomiTV 0.14.1。番組表・予約・放送波は EDCB。録画先は /media 以下を設定ファイルで指定する。"
 url: https://github.com/Khronos31/hassio-addons/tree/main/konomitv
