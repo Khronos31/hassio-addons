@@ -47,10 +47,9 @@ COPY BonDriver_S1UD.cpp /BonDriver_S1UD.cpp
 RUN g++ -std=c++17 -fPIC -shared -o /usr/local/lib/edcb/BonDriver_S1UD.so /BonDriver_S1UD.cpp -pthread
 
 # px4-userland (PX-Q3U4 / PX-MLT5PE 系) を直接開く BonDriver。
-# _T は地上波、_S は BS/CS。受信機の取り合いは flock で共有する。
+# GR/BS/CS の3 space を持ち、筐体をまたいだ受信機プールの取り合いは flock で共有する。
 COPY BonDriver_Px4.cpp /BonDriver_Px4.cpp
-RUN g++ -std=c++17 -fPIC -shared -o /usr/local/lib/edcb/BonDriver_Px4_T.so /BonDriver_Px4.cpp -pthread \
- && g++ -std=c++17 -fPIC -shared -DPX4_BONDRIVER_SATELLITE=1 -o /usr/local/lib/edcb/BonDriver_Px4_S.so /BonDriver_Px4.cpp -pthread
+RUN g++ -std=c++17 -fPIC -shared -o /usr/local/lib/edcb/BonDriver_Px4.so /BonDriver_Px4.cpp -pthread
 
 FROM debian:bookworm-slim AS tuners
 
@@ -70,10 +69,10 @@ RUN apt-get update \
 COPY tuner/ /tmp/tuner/
 
 RUN set -eux; \
-    siano_tag_object='5e584d18f95884362b4df6cf02c8215fb02b551b'; \
-    siano_resolved_commit='ad9bc7361288e9c188a1d8235ab946ac8b7bd6ac'; \
-    px4_tag_object='0c72e5281252b412879c527f637b9da39cb85f58'; \
-    px4_resolved_commit='3477301c09578d6c0d85f381c1448a5c53157a68'; \
+    siano_tag_object='6e68693b11a5f7918ce86e086b386ed47d4cb375'; \
+    siano_resolved_commit='d1f4e42810d5a2023ff4a6c31f798cb381026693'; \
+    px4_tag_object='cf38742618bb02db41a95def619fbff50e9eb0f3'; \
+    px4_resolved_commit='cf38742618bb02db41a95def619fbff50e9eb0f3'; \
     recisdb_deb='https://github.com/kazuki0824/recisdb-rs/releases/download/1.2.4/recisdb_1.2.4-1_amd64.deb'; \
     recisdb_sha256='0ec83fc5d3779d95156265bda1af6ef0ca7d5b7db37e59dfa8bb17ced6a36f2a'; \
     siano_firmware_url='https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/isdbt_rio.inp?id=e981caea6ed33c48d25b7dbf473327dbd01df163'; \

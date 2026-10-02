@@ -1,10 +1,13 @@
-// PX-Q3U4 / PX-MLT5PE 系 (px4-userland) を EDCB の BonDriver として開く。
-// px4-ts-stream の出力を recisdb に通し、STRUCT_IBONDRIVER2 で返す。
+// px4-userland 対応機種 (PX-Q3U4 / PX-MLT5PE 系 / PX-M1UR / PX-S1UR など) を
+// EDCB の1つの BonDriver として開く。GR/BS/CS の3 space を持ち、接続中の
+// 筐体すべてをまたいだ物理受信機のプールから、選んだ system に合う空きを
+// 選んで確保する。M1UR の1基は T/S 両対応だが排他は instance + receiver の
+// 1つの flock で共有する。方式を変えるとき非対応の受信機は解放し、選び直す。
 //
-// 地上波用 (_T) は `-DPX4_BONDRIVER_SATELLITE` 無しで、
-// BS/CS 用 (_S) は `-DPX4_BONDRIVER_SATELLITE=1` でビルドする。
-// 受信機の割り当ては /run/edcb-px4/<serial>-<receiver>.lock の flock で
-// _T / _S の間でも共有する (MLT5 系は同じ受信機が地上波と衛星を兼ねる)。
+// 受信機プールは起動スクリプトが EDCB_PX4_SLOTS で渡す。
+//   key:instance:serial:receiver:systems;key:...
+// systems は T / S / TS。px4-ts は --instance で同じ endpoint を開く。
+// EDCB_PX4_GR_ONLY があるときは chscan 用に GR space だけを公開する。
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -21,6 +24,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -57,30 +61,31 @@ struct Bon2 {
 
 namespace {
 
-#ifdef PX4_BONDRIVER_SATELLITE
+constexpr int kFirstPhysical = 13;
+constexpr int kLastPhysical = 62;
+constexpr int kGrCount = kLastPhysical - kFirstPhysical + 1;
 constexpr int kBsTransponders = 12;  // 01,03,...,23
 constexpr int kBsSlots = 12;         // 0..11
 constexpr int kBsCount = kBsTransponders * kBsSlots;
 constexpr int kCsCount = 12;  // CS2,CS4,...,CS24
-constexpr int kChannelCount = kBsCount + kCsCount;
-constexpr int kSpaceCount = 2;
-#else
-constexpr int kFirstPhysical = 13;
-constexpr int kLastPhysical = 62;
-constexpr int kChannelCount = kLastPhysical - kFirstPhysical + 1;
-constexpr int kSpaceCount = 1;
-#endif
-
+constexpr int kTotalChannels = kGrCount + kBsCount + kCsCount;
+constexpr int kSpaceCount = 3;
 constexpr size_t kBufferCap = 8 * 1024 * 1024;
 
-struct ModelSpec;
+// 1つの物理受信機。systems は T/S/TS。
+struct Slot {
+    std::string model;
+    std::string instance;
+    std::string serial;
+    int receiver = -1;
+    bool supports_t = false;
+    bool supports_s = false;
+};
 
 struct Driver {
     std::mutex mu;
     std::condition_variable cv;
-    char serial[32] = {};
-    const ModelSpec* model = nullptr;
-    int receiver = -1;
+    int slot = -1;
     int lock_fd = -1;
     pid_t stream_pid = -1;
     pid_t decode_pid = -1;
@@ -94,7 +99,7 @@ struct Driver {
     bool got_bytes = false;
     std::vector<BYTE> buffer;
     std::vector<BYTE> handed;
-    uint16_t names[kChannelCount][8] = {};
+    uint16_t names[kTotalChannels][8] = {};
     uint16_t tuner_name[16] = {};
     uint16_t space_names[kSpaceCount][8] = {};
 };
@@ -108,117 +113,94 @@ void store_ascii(uint16_t* dst, const char* src) {
     *dst = 0;
 }
 
-struct ModelSpec {
-    const char* key;
-    const char* name;
-    int t_pool[8];
-    int t_count;
-    int s_pool[8];
-    int s_count;
-};
+std::vector<Slot> g_slots;
+bool g_has_t = false;
+bool g_has_s = false;
+bool g_gr_only = false;
 
-const ModelSpec* find_model(const char* key) {
-    static const ModelSpec kModels[] = {
-        {"px_q3u4", "PX-Q3U4", {2, 3, 6, 7}, 4, {0, 1, 4, 5}, 4},
-        {"px_q3pe4", "PX-Q3PE4", {2, 3, 6, 7}, 4, {0, 1, 4, 5}, 4},
-        {"px_q3pe5", "PX-Q3PE5", {2, 3, 6, 7}, 4, {0, 1, 4, 5}, 4},
-        {"px_w3u4", "PX-W3U4", {2, 3}, 2, {0, 1}, 2},
-        {"px_w3pe4", "PX-W3PE4", {2, 3}, 2, {0, 1}, 2},
-        {"px_w3pe5", "PX-W3PE5", {2, 3}, 2, {0, 1}, 2},
-        {"px_mlt5pe", "PX-MLT5PE", {0, 1, 2, 3, 4}, 5, {0, 1, 2, 3, 4}, 5},
-        {"dtv02a_5ts_p", "DTV02A-5TS-P", {0, 1, 2, 3, 4}, 5, {0, 1, 2, 3, 4}, 5},
-        {"px_mlt8pe3", "PX-MLT8PE3", {0, 1, 2}, 3, {0, 1, 2}, 3},
-        {"px_mlt8pe5", "PX-MLT8PE5", {0, 1, 2, 3, 4}, 5, {0, 1, 2, 3, 4}, 5},
-        {"dtv02a_4ts_p", "DTV02A-4TS-P", {0, 1, 2, 3}, 4, {0, 1, 2, 3}, 4},
-        {"px_m1ur", "PX-M1UR", {0}, 1, {0}, 1},
-        {"px_s1ur", "PX-S1UR", {0}, 1, {0, 0}, 0},
-        {"dtv03a_1tu", "DTV03A-1TU", {0}, 1, {0, 0}, 0},
-        {"dtv02_1t1s_u", "DTV02-1T1S-U", {0}, 1, {0}, 1},
-        {"dtv02a_1t1s_u", "DTV02A-1T1S-U", {0}, 1, {0}, 1},
-    };
-    if (key == nullptr || *key == '\0') {
-        return nullptr;
-    }
-    for (const auto& model : kModels) {
-        if (strcmp(model.key, key) == 0) {
-            return &model;
+bool split_slot(const std::string& entry, Slot* slot) {
+    std::vector<std::string> fields;
+    std::size_t start = 0;
+    while (true) {
+        const std::size_t separator = entry.find(':', start);
+        if (separator == std::string::npos) {
+            fields.push_back(entry.substr(start));
+            break;
         }
+        fields.push_back(entry.substr(start, separator - start));
+        start = separator + 1;
     }
-    return nullptr;
+    if (fields.size() != 5 || fields[0].empty() || fields[1].empty() ||
+        fields[2].empty() || fields[4].empty()) {
+        return false;
+    }
+    char* end = nullptr;
+    const long receiver = strtol(fields[3].c_str(), &end, 10);
+    if (end == nullptr || *end != '\0' || receiver < 0 || receiver > 7) {
+        return false;
+    }
+    slot->model = fields[0];
+    slot->instance = fields[1];
+    slot->serial = fields[2];
+    slot->receiver = static_cast<int>(receiver);
+    slot->supports_t = fields[4].find('T') != std::string::npos;
+    slot->supports_s = fields[4].find('S') != std::string::npos;
+    return slot->supports_t || slot->supports_s;
+}
+
+void load_slots() {
+    const char* env = getenv("EDCB_PX4_SLOTS");
+    if (env == nullptr) {
+        return;
+    }
+    const std::string text(env);
+    std::size_t start = 0;
+    while (start < text.size()) {
+        std::size_t end = text.find(';', start);
+        if (end == std::string::npos) {
+            end = text.size();
+        }
+        const std::string entry = text.substr(start, end - start);
+        start = end + 1;
+        if (entry.empty()) {
+            continue;
+        }
+        Slot slot;
+        if (!split_slot(entry, &slot)) {
+            continue;
+        }
+        g_slots.push_back(slot);
+        g_has_t = g_has_t || slot.supports_t;
+        g_has_s = g_has_s || slot.supports_s;
+    }
+    g_gr_only = getenv("EDCB_PX4_GR_ONLY") != nullptr;
 }
 
 void init_names(Driver* d) {
-    const char* env = getenv("PX4_DEVICE");
-    if (env != nullptr && strlen(env) < sizeof(d->serial)) {
-        snprintf(d->serial, sizeof(d->serial), "%s", env);
+    store_ascii(d->tuner_name, "PX4");
+    for (int i = 0; i < kGrCount; i++) {
+        char text[8];
+        snprintf(text, sizeof text, "T%d", kFirstPhysical + i);
+        store_ascii(d->names[i], text);
     }
-    const char* model_env = getenv("PX4_MODEL");
-    if (model_env != nullptr && *model_env != '\0') {
-        d->model = find_model(model_env);
-    }
-    if (d->model == nullptr) {
-        size_t len = strlen(d->serial);
-        if (len == 14) {
-            d->model = find_model("px_q3u4");
-        } else if (len == 15) {
-            d->model = find_model("px_mlt5pe");
-        }
-    }
-    store_ascii(d->tuner_name, d->model != nullptr ? d->model->name : "PX4");
-#ifdef PX4_BONDRIVER_SATELLITE
     for (int i = 0; i < kBsCount; i++) {
-        int tp = 1 + 2 * (i / kBsSlots);
-        int slot = i % kBsSlots;
+        const int tp = 1 + 2 * (i / kBsSlots);
+        const int slot = i % kBsSlots;
         char text[8];
         snprintf(text, sizeof text, "BS%02d_%d", tp, slot);
-        store_ascii(d->names[i], text);
+        store_ascii(d->names[kGrCount + i], text);
     }
     for (int i = 0; i < kCsCount; i++) {
         char text[8];
         snprintf(text, sizeof text, "CS%d", 2 + 2 * i);
-        store_ascii(d->names[kBsCount + i], text);
-    }
-    store_ascii(d->space_names[0], "BS");
-    store_ascii(d->space_names[1], "CS");
-#else
-    for (int i = 0; i < kChannelCount; i++) {
-        char text[8];
-        snprintf(text, sizeof text, "T%d", kFirstPhysical + i);
-        store_ascii(d->names[i], text);
+        store_ascii(d->names[kGrCount + kBsCount + i], text);
     }
     d->space_names[0][0] = 0x5730;
     d->space_names[0][1] = 0x4E0A;
     d->space_names[0][2] = 0x6CE2;
     d->space_names[0][3] = 0;
-#endif
-}
-
-int receiver_pool_size(const Driver* d) {
-    if (d->model == nullptr) {
-        return 0;
-    }
-#ifdef PX4_BONDRIVER_SATELLITE
-    return d->model->s_count;
-#else
-    return d->model->t_count;
-#endif
-}
-
-int receiver_in_pool(const Driver* d, int index) {
-    if (d->model == nullptr || index < 0) {
-        return -1;
-    }
-#ifdef PX4_BONDRIVER_SATELLITE
-    if (index >= d->model->s_count) {
-        return -1;
-    }
-    return d->model->s_pool[index];
-#else
-    if (index >= d->model->t_count) {
-        return -1;
-    }
-    return d->model->t_pool[index];
-#endif
+    store_ascii(d->space_names[1], "BS");
+    store_ascii(d->space_names[2], "CS");
 }
 
 void kill_pid(pid_t pid) {
@@ -290,7 +272,16 @@ void reader_main(Driver* d, int fd) {
     }
 }
 
-int claim_receiver(Driver* d) {
+void release_slot(Driver* d) {
+    if (d->lock_fd >= 0) {
+        flock(d->lock_fd, LOCK_UN);
+        close(d->lock_fd);
+        d->lock_fd = -1;
+    }
+    d->slot = -1;
+}
+
+int claim_slot(Driver* d, bool want_t) {
     const char* lock_dir = getenv("EDCB_PX4_LOCK_DIR");
     char default_lock_dir[1024];
     if (lock_dir == nullptr) {
@@ -306,24 +297,35 @@ int claim_receiver(Driver* d) {
 #endif
     }
     mkdir(lock_dir, 0755);
-    int size = receiver_pool_size(d);
-    for (int i = 0; i < size; i++) {
-        int receiver = receiver_in_pool(d, i);
-        if (receiver < 0) {
-            continue;
+    // Dedicated receivers should be used before a T/S hybrid (such as M1UR),
+    // so an early GR session cannot strand a later satellite session.
+    for (int pass = 0; pass < 2; pass++) {
+        for (size_t i = 0; i < g_slots.size(); i++) {
+            const Slot& slot = g_slots[i];
+            if (want_t && !slot.supports_t) {
+                continue;
+            }
+            if (!want_t && !slot.supports_s) {
+                continue;
+            }
+            const bool hybrid = slot.supports_t && slot.supports_s;
+            if ((pass == 0 && hybrid) || (pass == 1 && !hybrid)) {
+                continue;
+            }
+            char path[1024];
+            snprintf(path, sizeof path, "%s/%s-%d.lock", lock_dir, slot.instance.c_str(),
+                     slot.receiver);
+            int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+            if (fd < 0) {
+                continue;
+            }
+            if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
+                d->lock_fd = fd;
+                d->slot = static_cast<int>(i);
+                return 0;
+            }
+            close(fd);
         }
-        char path[1024];
-        snprintf(path, sizeof path, "%s/%s-%d.lock", lock_dir, d->serial, receiver);
-        int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
-        if (fd < 0) {
-            continue;
-        }
-        if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
-            d->lock_fd = fd;
-            d->receiver = receiver;
-            return receiver;
-        }
-        close(fd);
     }
     return -1;
 }
@@ -334,10 +336,7 @@ BOOL open_tuner(void* p) {
     if (d->opened) {
         return 1;
     }
-    if (d->serial[0] == '\0') {
-        return 0;
-    }
-    if (claim_receiver(d) < 0) {
+    if (g_slots.empty()) {
         return 0;
     }
     d->opened = true;
@@ -349,17 +348,16 @@ void close_tuner(void* p) {
     Driver* d = driver(p);
     std::unique_lock<std::mutex> lock(d->mu);
     stop_pipeline(d, lock);
-    if (d->lock_fd >= 0) {
-        flock(d->lock_fd, LOCK_UN);
-        close(d->lock_fd);
-        d->lock_fd = -1;
-    }
-    d->receiver = -1;
+    release_slot(d);
     d->opened = false;
     d->have_channel = false;
 }
 
 bool spawn_pipeline(Driver* d, const char* channel, bool decode) {
+    if (d->slot < 0 || d->slot >= static_cast<int>(g_slots.size())) {
+        return false;
+    }
+    const Slot& slot = g_slots[d->slot];
     int to_decode[2] = {-1, -1};
     int from_decode[2] = {-1, -1};
     if (pipe(to_decode) != 0) {
@@ -389,10 +387,11 @@ bool spawn_pipeline(Driver* d, const char* channel, bool decode) {
             close(from_decode[1]);
         }
         char receiver[16];
-        snprintf(receiver, sizeof receiver, "%d", d->receiver);
-        setenv("PX4_DEVICE", d->serial, 1);
+        snprintf(receiver, sizeof receiver, "%d", slot.receiver);
+        setenv("PX4_INSTANCE", slot.instance.c_str(), 1);
+        setenv("PX4_DEVICE", slot.serial.c_str(), 1);
         setenv("PX4_RECEIVER", receiver, 1);
-        setenv("PX4_MODEL", d->model != nullptr ? d->model->key : "", 1);
+        setenv("PX4_MODEL", slot.model.c_str(), 1);
         char runtime_dir[1024];
         const char* tmpdir = getenv("TMPDIR");
         if (tmpdir == nullptr) {
@@ -462,25 +461,46 @@ bool want_decode() {
     return env == nullptr || strcmp(env, "0") != 0;
 }
 
-#ifdef PX4_BONDRIVER_SATELLITE
 BOOL tune(Driver* d, DWORD space, DWORD channel) {
     std::unique_lock<std::mutex> lock(d->mu);
-    if (!d->opened || space >= kSpaceCount || channel >= static_cast<DWORD>(kChannelCount)) {
+    if (!d->opened) {
         return 0;
     }
+    const bool want_t = space == 0;
     char name[16];
     if (space == 0) {
-        if (channel >= kBsCount) {
+        if (channel >= static_cast<DWORD>(kGrCount)) {
             return 0;
         }
-        int tp = 1 + 2 * static_cast<int>(channel / kBsSlots);
-        int slot = static_cast<int>(channel % kBsSlots);
+        snprintf(name, sizeof name, "T%d", kFirstPhysical + static_cast<int>(channel));
+    } else if (space == 1) {
+        if (channel >= static_cast<DWORD>(kBsCount)) {
+            return 0;
+        }
+        const int tp = 1 + 2 * (static_cast<int>(channel) / kBsSlots);
+        const int slot = static_cast<int>(channel) % kBsSlots;
         snprintf(name, sizeof name, "BS%02d_%d", tp, slot);
-    } else {
-        if (channel >= kCsCount) {
+    } else if (space == 2) {
+        if (channel >= static_cast<DWORD>(kCsCount)) {
             return 0;
         }
         snprintf(name, sizeof name, "CS%d", 2 + 2 * static_cast<int>(channel));
+    } else {
+        return 0;
+    }
+    // system が変わり今の受信機が非対応なら、解放してから選び直す。
+    if (d->slot >= 0) {
+        const Slot& current = g_slots[d->slot];
+        if (want_t ? !current.supports_t : !current.supports_s) {
+            stop_pipeline(d, lock);
+            release_slot(d);
+        }
+    }
+    if (d->slot < 0) {
+        stop_pipeline(d, lock);
+        if (claim_slot(d, want_t) < 0) {
+            return 0;
+        }
     }
     stop_pipeline(d, lock);
     if (!spawn_pipeline(d, name, want_decode())) {
@@ -496,44 +516,17 @@ BOOL tune(Driver* d, DWORD space, DWORD channel) {
     d->have_channel = true;
     return 1;
 }
-#else
-BOOL tune(Driver* d, int physical) {
-    std::unique_lock<std::mutex> lock(d->mu);
-    if (!d->opened || physical < kFirstPhysical || physical > kLastPhysical) {
-        return 0;
-    }
-    stop_pipeline(d, lock);
-    char channel[8];
-    snprintf(channel, sizeof channel, "T%d", physical);
-    if (!spawn_pipeline(d, channel, want_decode())) {
-        return 0;
-    }
-    d->cv.wait_for(lock, std::chrono::seconds(4), [&] { return d->got_bytes || d->stop; });
-    if (!d->got_bytes) {
-        stop_pipeline(d, lock);
-        return 0;
-    }
-    d->channel = static_cast<DWORD>(physical - kFirstPhysical);
-    d->have_channel = true;
-    return 1;
-}
-#endif
 
-#ifdef PX4_BONDRIVER_SATELLITE
-BOOL set_channel_byte(void* p, BYTE ch) {
-    (void)p;
-    (void)ch;
-    return 0;
-}
-#else
 BOOL set_channel_byte(void* p, BYTE ch) {
     int physical = ch;
-    if (physical < kFirstPhysical && physical < kChannelCount) {
+    if (physical < kFirstPhysical && physical < kGrCount) {
         physical = kFirstPhysical + physical;
     }
-    return tune(driver(p), physical);
+    if (physical < kFirstPhysical || physical > kLastPhysical) {
+        return 0;
+    }
+    return tune(driver(p), 0, static_cast<DWORD>(physical - kFirstPhysical));
 }
-#endif
 
 float signal_level(void* p) {
     Driver* d = driver(p);
@@ -613,51 +606,54 @@ BOOL is_open(void* p) {
 }
 
 const uint16_t* enum_space(void* p, DWORD space) {
+    if (g_gr_only) {
+        if (space != 0 || !g_has_t) {
+            return nullptr;
+        }
+        return driver(p)->space_names[0];
+    }
     if (space >= kSpaceCount) {
+        return nullptr;
+    }
+    if (space == 0 && !g_has_t) {
+        return nullptr;
+    }
+    if ((space == 1 || space == 2) && !g_has_s) {
         return nullptr;
     }
     return driver(p)->space_names[space];
 }
 
 const uint16_t* enum_channel(void* p, DWORD space, DWORD channel) {
-    if (space >= kSpaceCount) {
+    if (g_gr_only && space != 0) {
         return nullptr;
     }
-#ifdef PX4_BONDRIVER_SATELLITE
     if (space == 0) {
-        if (channel >= kBsCount) {
+        if (channel >= static_cast<DWORD>(kGrCount)) {
             return nullptr;
         }
         return driver(p)->names[channel];
     }
-    if (channel >= kCsCount) {
-        return nullptr;
+    if (space == 1) {
+        if (channel >= static_cast<DWORD>(kBsCount)) {
+            return nullptr;
+        }
+        return driver(p)->names[kGrCount + channel];
     }
-    return driver(p)->names[kBsCount + channel];
-#else
-    if (channel >= kChannelCount) {
-        return nullptr;
+    if (space == 2) {
+        if (channel >= static_cast<DWORD>(kCsCount)) {
+            return nullptr;
+        }
+        return driver(p)->names[kGrCount + kBsCount + channel];
     }
-    return driver(p)->names[channel];
-#endif
+    return nullptr;
 }
 
 BOOL set_channel(void* p, DWORD space, DWORD channel) {
-    Driver* d = driver(p);
-#ifdef PX4_BONDRIVER_SATELLITE
-    return tune(d, space, channel);
-#else
-    if (space != 0 || channel >= static_cast<DWORD>(kChannelCount)) {
+    if (g_gr_only && space != 0) {
         return 0;
     }
-    BOOL ok = tune(d, kFirstPhysical + static_cast<int>(channel));
-    if (ok) {
-        std::lock_guard<std::mutex> guard(d->mu);
-        d->space = space;
-        d->channel = channel;
-    }
-    return ok;
-#endif
+    return tune(driver(p), space, channel);
 }
 
 DWORD cur_space(void* p) { return driver(p)->space; }
@@ -672,6 +668,7 @@ Bon2 g_bon;
 extern "C" const Bon1* CreateBonStruct(void) {
     static int ready = 0;
     if (!ready) {
+        load_slots();
         init_names(&g_driver);
         memset(&g_bon, 0, sizeof g_bon);
         g_bon.base.ctx = &g_driver;

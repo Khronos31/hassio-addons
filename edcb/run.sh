@@ -9,6 +9,27 @@ SEED=/usr/share/edcb/seed
 CFG=/config
 LIB=/usr/local/lib/edcb
 OPTIONS=/data/options.json
+PX4_DAEMON_PIDS=
+pcscd_pid=
+scan_pid=
+srv_pid=
+
+cleanup_children() {
+    [ -z "$scan_pid" ] || kill -TERM "$scan_pid" 2>/dev/null || true
+    [ -z "$srv_pid" ] || kill -TERM "$srv_pid" 2>/dev/null || true
+    [ -z "$pcscd_pid" ] || kill -TERM "$pcscd_pid" 2>/dev/null || true
+    for pid in $PX4_DAEMON_PIDS; do
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+    [ -z "$scan_pid" ] || wait "$scan_pid" 2>/dev/null || true
+    [ -z "$srv_pid" ] || wait "$srv_pid" 2>/dev/null || true
+    [ -z "$pcscd_pid" ] || wait "$pcscd_pid" 2>/dev/null || true
+    for pid in $PX4_DAEMON_PIDS; do
+        wait "$pid" 2>/dev/null || true
+    done
+}
+trap cleanup_children EXIT
+trap 'exit 0' HUP TERM INT
 
 MIRAKC_URL=
 DECODE=1
@@ -102,7 +123,15 @@ GetEpg=1
 EPGCount=1
 Priority=0
 
-; px4-userland の機材 (PX-Q3U4 / PX-MLT5PE 系)。本数は起動時に自動で書き直す。
+; px4-userland の機材。1つの hybrid BonDriver が GR/BS/CS を持ち、
+; 本数 (物理受信機数) は起動時に自動で書き直す。
+[BonDriver_Px4.so]
+Count=0
+GetEpg=1
+EPGCount=1
+Priority=4
+
+; 旧 _T / _S 分割時代の残骸。Count は起動時に 0 へ書き直す。
 [BonDriver_Px4_T.so]
 Count=0
 GetEpg=1
@@ -207,11 +236,11 @@ set_bondriver_count() {
 }
 
 # KonomiTV の NWTV (ライブ視聴) は [TVTEST] に列挙された BonDriver しか
-# 使えない。px4 を検出したら Px4 BonDriver を追加する。
+# 使えない。px4 の受信機が1基でもあれば hybrid な Px4 BonDriver を追加する。
 set_tvtest() {
     ini="$CFG/EpgTimerSrv.ini"
-    if [ -n "$PX4_DEVICE" ]; then
-        bon_list="BonDriver_S1UD.so BonDriver_Px4_T.so BonDriver_Px4_S.so"
+    if [ "$PX4_SLOT_COUNT" -gt 0 ]; then
+        bon_list="BonDriver_S1UD.so BonDriver_Px4.so"
     else
         bon_list="BonDriver_S1UD.so"
     fi
@@ -231,93 +260,358 @@ set_tvtest() {
     ' "$ini" > "$ini.tmp" && mv "$ini.tmp" "$ini"
 }
 
-# px4-userland 対応機種が刺さっていれば px4d を起こし、
-# BonDriver_Px4_T/S の本数を書き直す。受信機の取り合いは BonDriver 側の
-# flock で解決するので、Count は受信機の本数でよい。
-PX4_DEVICE=
-PX4_MODEL=
+# px4d --list-json を列挙の唯一の根拠にする。筐体ごとの instance と
+# `--usb-path`、受信機ごとの system を検証して plan に落とし、EDCB の
+# hybrid BonDriver へ EDCB_PX4_SLOTS で渡す。M1UR/S1UR は別 model かつ各1
+# candidate の duplicate として返るため、USB path を指定して個別起動できる。
+# 同一機種・同一 serial の複数候補、incomplete/invalid な筐体、未割当の USB は拒否する。
 PX4_FIRMWARE=/lib/firmware/it930x-firmware.bin
 PX4_RUNTIME_DIR=/run/px4-userland
-if [ -x /usr/local/bin/px4-detect ] && [ -x /usr/local/bin/px4d ] && [ -r "$PX4_FIRMWARE" ]; then
-    if detection=$(/usr/local/bin/px4-detect 2>/dev/null); then
-        PX4_MODEL=${detection%% *}
-        PX4_DEVICE=${detection#* }
-        case "$PX4_MODEL" in
-            px_q3u4|px_q3pe4|px_q3pe5) T_COUNT=4; S_COUNT=4 ;;
-            px_w3u4|px_w3pe4|px_w3pe5) T_COUNT=2; S_COUNT=2 ;;
-            px_mlt5pe|dtv02a_5ts_p|px_mlt8pe5) T_COUNT=5; S_COUNT=5 ;;
-            px_mlt8pe3) T_COUNT=3; S_COUNT=3 ;;
-            dtv02a_4ts_p) T_COUNT=4; S_COUNT=4 ;;
-            px_m1ur|dtv02_1t1s_u|dtv02a_1t1s_u) T_COUNT=1; S_COUNT=1 ;;
-            px_s1ur|dtv03a_1tu) T_COUNT=1; S_COUNT=0 ;;
-            *)
-                echo "px4 の検出結果が読めません: ${detection}" >&2
-                PX4_DEVICE=
-                PX4_MODEL=
+PX4_JSON=/run/edcb-px4/list.json
+PX4_PLAN=/run/edcb-px4/plan
+PX4_SLOTS=
+PX4_SLOT_COUNT=0
+PX4_PLAN_AVAILABLE=0
+: > "$PX4_PLAN"
+
+collect_px4_plan()
+{
+    if [ ! -x /usr/local/bin/px4d ]; then
+        echo "PX4: px4d が無いため使いません" >&2
+        return 1
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "PX4: jq が無いため列挙を検証できません" >&2
+        return 1
+    fi
+    if ! /usr/local/bin/px4d --list-json > "$PX4_JSON" 2> /run/edcb-px4/list.err; then
+        if [ -s /run/edcb-px4/list.err ]; then
+            cat /run/edcb-px4/list.err >&2
+        fi
+        echo "PX4: px4d --list-json に失敗しました" >&2
+        return 1
+    fi
+    if [ -s /run/edcb-px4/list.err ]; then
+        cat /run/edcb-px4/list.err >&2
+    fi
+
+    if ! jq -e '
+        def bridge_count:
+            if (.model == "PX-Q3U4" or .model == "PX-Q3PE4" or .model == "PX-Q3PE5")
+            then 2 else 1 end;
+        def receiver_count:
+            if (.model == "PX-Q3U4" or .model == "PX-Q3PE4" or .model == "PX-Q3PE5") then 8
+            elif (.model == "PX-W3U4" or .model == "PX-W3PE4" or .model == "PX-W3PE5") then 4
+            elif (.model == "PX-MLT5PE" or .model == "DTV02A-5TS-P" or .model == "PX-MLT8PE5") then 5
+            elif .model == "PX-MLT8PE3" then 3
+            elif .model == "DTV02A-4TS-P" then 4
+            else 1 end;
+        def selected_devices:
+            if .status == "ready" then .devices
+            elif .status == "duplicate" then .candidates
+            else [] end;
+        def usbpath:
+            if (.port | type) == "string" and (.port | length) > 0 then .port
+            else "\(.bus):\(.address)" end;
+        (.enclosures | type == "array") and
+        (.ungrouped_usb_devices | type == "array") and
+        (.ungrouped_usb_devices | length == 0) and
+        (all(.enclosures[];
+            (.serial as $serial |
+            (.model | type == "string") and
+            (.serial | type == "string") and
+            (.status != "duplicate" or
+             ([.enclosures[] | select(.serial == $serial)] as $groups |
+              ($groups | length) == 2 and
+              ($groups | map(.model) | unique | length) == 2 and
+              all($groups[]; .status == "duplicate"))) and
+            (.receivers | type == "array") and
+            ((.receivers | length) == receiver_count) and
+            (([.receivers[].receiver] | sort) == [range(0; receiver_count)]) and
+            (all(.receivers[]; (.receiver | type == "number") and
+                 (.system == "ISDB-T" or .system == "ISDB-S" or .system == "ISDB-T/S"))) and
+            (.devices | type == "array") and
+            (.candidates | type == "array") and
+            ((.status == "ready" and (.candidates | length == 0)) or
+             (.status == "duplicate" and (.devices | length == 0))) and
+            ((selected_devices | length) == bridge_count) and
+            (([selected_devices[] | usbpath] | unique | length) == bridge_count) and
+            (all(selected_devices[];
+                ((.port | type == "string" and length > 0) or
+                 ((.bus | type == "number") and (.address | type == "number"))))))))
+    ' "$PX4_JSON" >/dev/null 2>&1; then
+        echo "PX4: 未確定または不完全な筐体、もしくは未割当の USB があるため使いません" >&2
+        return 1
+    fi
+
+    if ! jq -r '
+        def selected_devices:
+            if .status == "ready" then .devices else .candidates end;
+        def usbpath:
+            if (.port | type) == "string" and (.port | length) > 0 then .port
+            else "\(.bus):\(.address)" end;
+        .enclosures[] |
+        [ .model, .serial, (selected_devices | length),
+          ([selected_devices[] | .device] | sort | join(",")),
+          ([selected_devices | sort_by(.device)[] | usbpath] | join(",")),
+          ([.receivers[] | (.receiver | tostring) + ":" + .system] | join(",")) ] |
+        @tsv
+    ' "$PX4_JSON" > /run/edcb-px4/enclosures.tsv; then
+        echo "PX4: 列挙の整形に失敗しました" >&2
+        return 1
+    fi
+
+    : > "$PX4_PLAN"
+    PX4_SLOTS=
+    PX4_SLOT_COUNT=0
+    seen=
+    seen_usb_paths=
+
+    while IFS="$(printf '\t')" read -r model serial devcount devlist portlist recvlist; do
+        [ -n "$model" ] || continue
+        case $model in
+            PX-Q3U4|PX-Q3PE4|PX-Q3PE5) bridges=2 ;;
+            PX-W3U4|PX-W3PE4|PX-W3PE5|PX-MLT5PE|DTV02A-5TS-P|PX-MLT8PE3|PX-MLT8PE5|DTV02A-4TS-P|PX-M1UR|PX-S1UR|DTV03A-1TU|DTV02-1T1S-U|DTV02A-1T1S-U) bridges=1 ;;
+            *) echo "PX4: 未対応の機種です: $model" >&2; return 1 ;;
+        esac
+        case $seen in
+            *"|$model/$serial|"*)
+                echo "PX4: 同じ機種と serial の筐体が複数あり選択できません: $model $serial" >&2
+                return 1
                 ;;
         esac
-        if [ -n "$PX4_DEVICE" ]; then
-            echo "px4 を検出しました: ${PX4_MODEL} ${PX4_DEVICE} (T=${T_COUNT}, S=${S_COUNT})。px4d を起動します。"
-            /usr/local/bin/px4d --device "$PX4_DEVICE" --firmware "$PX4_FIRMWARE" --runtime-dir "$PX4_RUNTIME_DIR" &
-            set_bondriver_count "BonDriver_Px4_T.so" "$T_COUNT" 4
-            set_bondriver_count "BonDriver_Px4_S.so" "$S_COUNT" 5
+        seen="$seen|$model/$serial|"
+        if [ "$bridges" = 2 ]; then
+            case $serial in
+                [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+                *) echo "PX4: serial が14桁ではありません: $serial" >&2; return 1 ;;
+            esac
+            expected_devs=1,2
+        else
+            case $serial in
+                [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+                *) echo "PX4: serial が15桁ではありません: $serial" >&2; return 1 ;;
+            esac
+            expected_devs=1
         fi
+        if [ "$devcount" != "$bridges" ] || [ "$devlist" != "$expected_devs" ]; then
+            echo "PX4: USB デバイス構成が不正です: $model $serial (devices=$devlist)" >&2
+            return 1
+        fi
+
+        old_ifs=$IFS
+        IFS=,
+        # shellcheck disable=SC2086
+        set -- $portlist
+        IFS=$old_ifs
+        if [ "$#" -ne "$bridges" ]; then
+            echo "PX4: USB パス数が不正です: $model $serial ($portlist)" >&2
+            return 1
+        fi
+        p1=$1
+        p2=${2:-}
+        if [ -z "$p1" ]; then
+            echo "PX4: USB パスが空です: $model $serial" >&2
+            return 1
+        fi
+        if [ "$bridges" = 2 ] && [ -z "$p2" ]; then
+            echo "PX4: 2つ目の USB パスが空です: $model $serial" >&2
+            return 1
+        fi
+        case $seen_usb_paths in
+            *"|$p1|"*)
+                echo "PX4: 同じ USB パスが複数の筐体候補に割り当てられています: $p1" >&2
+                return 1
+                ;;
+        esac
+        seen_usb_paths="$seen_usb_paths|$p1|"
+        if [ -n "$p2" ]; then
+            case $seen_usb_paths in
+                *"|$p2|"*)
+                    echo "PX4: 同じ USB パスが複数の筐体候補に割り当てられています: $p2" >&2
+                    return 1
+                    ;;
+            esac
+            seen_usb_paths="$seen_usb_paths|$p2|"
+        fi
+
+        key=$(printf '%s' "$model" | tr 'A-Z-' 'a-z_')
+        instance="px4-$key-$serial"
+        printf '%s %s %s %s %s %s %s\n' "$model" "$key" "$instance" "$serial" "$bridges" "$p1" "$p2" >> "$PX4_PLAN"
+
+        old_ifs=$IFS
+        IFS=,
+        for record in $recvlist; do
+            receiver=${record%%:*}
+            system=${record#*:}
+            case $receiver in
+                ''|*[!0-9]*) echo "PX4: 受信機番号が不正です: $record" >&2; IFS=$old_ifs; return 1 ;;
+            esac
+            case $system in
+                ISDB-T) systems=T ;;
+                ISDB-S) systems=S ;;
+                ISDB-T/S) systems=TS ;;
+                *) echo "PX4: 不明な system です: $record" >&2; IFS=$old_ifs; return 1 ;;
+            esac
+            PX4_SLOTS="${PX4_SLOTS}${PX4_SLOTS:+;}$key:$instance:$serial:$receiver:$systems"
+            PX4_SLOT_COUNT=$((PX4_SLOT_COUNT + 1))
+        done
+        IFS=$old_ifs
+    done < /run/edcb-px4/enclosures.tsv
+
+    if [ "$PX4_SLOT_COUNT" -gt 0 ]; then
+        PX4_PLAN_AVAILABLE=1
     fi
-fi
+    return 0
+}
+
+# 筐体ごとに1つの px4d を instance 付きで起こし、px4ctl で ready を確認する。
+start_px4d_enclosures()
+{
+    while read -r model key instance serial bridges p1 p2; do
+        [ -n "$instance" ] || continue
+        echo "PX4: px4d を起動します instance=$instance device=$serial usb-path=$p1${p2:+ $p2}" >&2
+        if [ "$bridges" = 2 ]; then
+            /usr/local/bin/px4d \
+                --device "$serial" \
+                --usb-path "$p1" \
+                --usb-path "$p2" \
+                --instance "$instance" \
+                --firmware "$PX4_FIRMWARE" \
+                --runtime-dir "$PX4_RUNTIME_DIR" &
+        else
+            /usr/local/bin/px4d \
+                --device "$serial" \
+                --usb-path "$p1" \
+                --instance "$instance" \
+                --firmware "$PX4_FIRMWARE" \
+                --runtime-dir "$PX4_RUNTIME_DIR" &
+        fi
+        px4d_pid=$!
+        PX4_DAEMON_PIDS="$PX4_DAEMON_PIDS $px4d_pid"
+        if ! wait_px4_instance_ready "$instance" "$bridges" "$px4d_pid"; then
+            return 1
+        fi
+    done < "$PX4_PLAN"
+    return 0
+}
+
+wait_px4_instance_ready()
+{
+    instance=$1
+    bridges=$2
+    pid=$3
+    if [ "$bridges" = 2 ]; then
+        px4_usb_mask=0x03
+    else
+        px4_usb_mask=0x01
+    fi
+    wait_deadline=$(( $(date +%s) + 10 ))
+    while :; do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            echo "PX4: px4d が ready 前に終了しました instance=$instance" >&2
+            return 1
+        fi
+        if output=$(/usr/local/bin/px4ctl --instance "$instance" --runtime-dir "$PX4_RUNTIME_DIR" list 2>/dev/null); then
+            if printf '%s\n' "$output" | awk -v mask="$px4_usb_mask" '
+                /(^|[[:space:]])ready=yes([[:space:]]|$)/ &&
+                $0 ~ ("(^|[[:space:]])usb-present-mask=" mask "([[:space:]]|$)") { found = 1 }
+                END { exit found ? 0 : 1 }
+            '; then
+                echo "PX4: px4d ready instance=$instance" >&2
+                return 0
+            fi
+        fi
+        now=$(date +%s)
+        [ "$now" -ge "$wait_deadline" ] && break
+        sleep 1
+    done
+    echo "PX4: px4d が ready になりません instance=$instance" >&2
+    return 1
+}
+
+stop_px4d_enclosures()
+{
+    for pid in $PX4_DAEMON_PIDS; do
+        kill -TERM "$pid" 2>/dev/null || :
+    done
+    for pid in $PX4_DAEMON_PIDS; do
+        wait "$pid" 2>/dev/null || :
+    done
+    PX4_DAEMON_PIDS=
+}
+
 # px4 系の内蔵カードスロットを pcscd 経由で使うための reader 設定。
 # recisdb は pcscd 経由で B-CAS カードを開く。USB CCID (SCR3310 等) は
-# pcscd が起動時に自動検出するので設定不要。
-if [ -n "$PX4_DEVICE" ]; then
+# pcscd が起動時に自動検出するので設定不要。serial が同じ M1UR と S1UR も
+# instance で区別する。
+write_reader_configs()
+{
     mkdir -p /etc/reader.conf.d
-    cat > /etc/reader.conf.d/px4-userland.conf <<EOF
-FRIENDLYNAME "PLEX PX4 Internal Card Reader"
-DEVICENAME   px4-userland:runtime=${PX4_RUNTIME_DIR}:device=${PX4_DEVICE}:access=user
+    rm -f /etc/reader.conf.d/px4-userland*.conf
+    while read -r model key instance serial bridges p1 p2; do
+        [ -n "$instance" ] || continue
+        cat > "/etc/reader.conf.d/px4-userland-$instance.conf" <<EOF
+FRIENDLYNAME "PLEX $model Internal Card Reader"
+DEVICENAME   px4-userland:runtime=${PX4_RUNTIME_DIR}:instance=${instance}:access=user
 LIBPATH      /usr/lib/px4-userland/libpx4-userland-ifd.so
 CHANNELID    0
 EOF
+    done < "$PX4_PLAN"
+}
+
+if ! collect_px4_plan; then
+    echo "PX4: 安全に全筐体を特定できないため EDCB を起動しません" >&2
+    exit 1
+fi
+
+if [ "$PX4_PLAN_AVAILABLE" -eq 1 ]; then
+    if [ ! -r "$PX4_FIRMWARE" ]; then
+        echo "PX4: ファームウェアがありません: $PX4_FIRMWARE" >&2
+        exit 1
+    fi
+    write_reader_configs
+    if ! start_px4d_enclosures; then
+        echo "PX4: すべての筐体を起動できなかったため EDCB を起動しません" >&2
+        stop_px4d_enclosures
+        rm -f /etc/reader.conf.d/px4-userland*.conf
+        exit 1
+    fi
+    echo "PX4 enabled: enclosures=$(awk '$1 == "enclosure" { n++ } END { print n + 0 }' "$PX4_PLAN") slots=$PX4_SLOT_COUNT" >&2
+else
+    rm -f /etc/reader.conf.d/px4-userland*.conf
 fi
 
 # USB CCID リーダーも px4 内蔵スロットも無い場合、recisdb decode は即終了して
 # TS が流れなくなるため decode を無効化する。
-if [ "$has_ccid" -eq 0 ] && [ -z "$PX4_DEVICE" ] && [ "$DECODE" -eq 1 ]; then
+if [ "$has_ccid" -eq 0 ] && [ "$PX4_SLOT_COUNT" -eq 0 ] && [ "$DECODE" -eq 1 ]; then
     echo "カードリーダー (USB CCID / px4 内蔵) が見つからないため decode を無効化します (recisdb はカード不在で即終了するため)。"
     DECODE=0
 fi
 
 if [ -x /usr/sbin/pcscd ]; then
     /usr/sbin/pcscd --foreground >> "$CFG/pcscd.log" 2>&1 &
+    pcscd_pid=$!
 fi
 
-# BS/CS の ChSet4 (サービス→物理チャンネル対応) を機種名付きで置く。
-# 中身は機種によらず同じで、ファイル名だけ BonDriver のチューナー名に合わせる。
-if [ -n "$PX4_MODEL" ] && [ -f "$SEED/Setting/ChSet4.bs.txt" ]; then
-    case "$PX4_MODEL" in
-        px_q3u4) px4_name=PX-Q3U4 ;;
-        px_q3pe4) px4_name=PX-Q3PE4 ;;
-        px_q3pe5) px4_name=PX-Q3PE5 ;;
-        px_w3u4) px4_name=PX-W3U4 ;;
-        px_w3pe4) px4_name=PX-W3PE4 ;;
-        px_w3pe5) px4_name=PX-W3PE5 ;;
-        px_mlt5pe) px4_name=PX-MLT5PE ;;
-        dtv02a_5ts_p) px4_name=DTV02A-5TS-P ;;
-        px_mlt8pe3) px4_name=PX-MLT8PE3 ;;
-        px_mlt8pe5) px4_name=PX-MLT8PE5 ;;
-        dtv02a_4ts_p) px4_name=DTV02A-4TS-P ;;
-        px_m1ur) px4_name=PX-M1UR ;;
-        px_s1ur) px4_name=PX-S1UR ;;
-        dtv03a_1tu) px4_name=DTV03A-1TU ;;
-        dtv02_1t1s_u) px4_name=DTV02-1T1S-U ;;
-        dtv02a_1t1s_u) px4_name=DTV02A-1T1S-U ;;
-        *) px4_name= ;;
-    esac
-    if [ -n "$px4_name" ] && [ ! -f "$CFG/Setting/BonDriver_Px4_S(${px4_name}).ChSet4.txt" ]; then
-        cp "$SEED/Setting/ChSet4.bs.txt" "$CFG/Setting/BonDriver_Px4_S(${px4_name}).ChSet4.txt"
-        echo "BS/CS のチャンネル対応を ${px4_name} 用に置きました。"
+# Hybrid BonDriver は1つの名前で GR/BS/CS を扱う。
+if [ "$PX4_SLOT_COUNT" -gt 0 ] && [ -f "$SEED/Setting/ChSet4.bs.txt" ]; then
+    mkdir -p "$CFG/Setting"
+    if [ ! -f "$CFG/Setting/BonDriver_Px4.ChSet4.txt" ]; then
+        cp "$SEED/Setting/ChSet4.bs.txt" "$CFG/Setting/BonDriver_Px4.ChSet4.txt"
+        echo "BS/CS のチャンネル対応を BonDriver_Px4 用に置きました。"
     fi
 fi
 
+# 起動ごとに実機の物理受信機数へ合わせる。古い分割ドライバー設定が
+# 残っていても起動対象にならないよう Count=0 にする。
+set_bondriver_count "BonDriver_Px4.so" "$PX4_SLOT_COUNT" 4
+set_bondriver_count "BonDriver_Px4_T.so" 0 4
+set_bondriver_count "BonDriver_Px4_S.so" 0 5
+
 set_tvtest
-export PX4_DEVICE PX4_MODEL PX4_RUNTIME_DIR
+export PX4_RUNTIME_DIR
+export EDCB_PX4_SLOTS="$PX4_SLOTS"
 # BonDriver_S1UD / _Px4 が recisdb を通すかどうか。decode=false なら素通し。
 export EDCB_DECODE=${DECODE}
 
@@ -343,6 +637,7 @@ trap terminate TERM INT
 
 if [ -n "$scan_pid" ]; then
     wait "$scan_pid" || true
+    scan_pid=
     if [ -f "$CFG/chscan.done" ]; then
         echo "チャンネルスキャンが完了したので、EDCB を再起動してチャンネル一覧を読み込みます。"
         terminate

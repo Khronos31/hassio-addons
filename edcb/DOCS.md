@@ -2,10 +2,14 @@
 
 [xtne6f/EDCB](https://github.com/xtne6f/EDCB) の Unix 版です。PX-S1UD は同梱の
 `BonDriver_S1UD` が、px4-userland 対応機種（全16モデル）は同梱の
-`BonDriver_Px4_T` / `BonDriver_Px4_S` が直接開きます。siano-userland、
+`BonDriver_Px4` が直接開きます。siano-userland、
 px4-userland、recisdb も同梱です。
 
 mirakc アドオンと同時に USB チューナーは開きません。どちらかを止めてください。
+
+複数の PX4 筐体を同時に使えます。Q3U4 系の8受信機、M1UR の地上波/BS・CS兼用1受信機、
+S1UR の地上波1受信機を接続すると、EDCB に計10本を自動登録します。M1UR の1受信機は
+地上波と BS/CS のどちらか一方に割り当て、同時に二重使用しません。
 
 ## 画面とポート
 
@@ -30,7 +34,7 @@ mirakc アドオンと同時に USB チューナーは開きません。どち�
 ## 起動時の動作
 
 - USB チューナーを検出し、`EpgTimerSrv.ini` の `Count` と `[TVTEST]` を機種に応じて書きます
-- px4-userland 対応機種の内蔵カードスロットを pcscd に登録します（recisdb の B-CAS 復号用）
+- 接続中の px4-userland 筐体を列挙し、個体ごとのカードスロットを pcscd に登録します（recisdb の B-CAS 復号用）
 - B-CAS カードを読む手段が無いときは `decode` を自動で無効化します
 - 初回起動時に地上波のチャンネルスキャンを一度だけ行います（進行は `chscan.log`、
   完了の印は `chscan.done`。やり直すときはこの2つを消して再起動）

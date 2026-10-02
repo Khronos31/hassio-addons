@@ -12,8 +12,16 @@ fi
 
 channel=$1
 
-if [ -z "${PX4_DEVICE+x}" ] || [ -z "$PX4_DEVICE" ]; then
-    echo "PX4_DEVICE is required" >&2
+# px4d の endpoint は --instance (新形式) か --device (serial) のどちらかを選ぶ。
+# 複数筐体では px4d が instance で起動されるため instance を優先する。
+if [ -n "${PX4_INSTANCE:-}" ]; then
+    px4_target_option=--instance
+    px4_target_value=$PX4_INSTANCE
+elif [ -n "${PX4_DEVICE:-}" ]; then
+    px4_target_option=--device
+    px4_target_value=$PX4_DEVICE
+else
+    echo "PX4_INSTANCE or PX4_DEVICE is required" >&2
     exit 2
 fi
 
@@ -29,27 +37,33 @@ if [ -n "${PX4_MODEL:-}" ]; then
             exit 2
             ;;
     esac
-    case $device_model in
-        px_q3u4|px_q3pe4|px_q3pe5)
-            case $PX4_DEVICE in
-                [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
-                *)
-                    echo "Invalid PX4_DEVICE (expected 14 digits for $device_model): $PX4_DEVICE" >&2
-                    exit 2
-                    ;;
-            esac
-            ;;
-        *)
-            case $PX4_DEVICE in
-                [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
-                *)
-                    echo "Invalid PX4_DEVICE (expected 15 digits for $device_model): $PX4_DEVICE" >&2
-                    exit 2
-                    ;;
-            esac
-            ;;
-    esac
+    if [ -z "${PX4_INSTANCE:-}" ]; then
+        case $device_model in
+            px_q3u4|px_q3pe4|px_q3pe5)
+                case $PX4_DEVICE in
+                    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+                    *)
+                        echo "Invalid PX4_DEVICE (expected 14 digits for $device_model): $PX4_DEVICE" >&2
+                        exit 2
+                        ;;
+                esac
+                ;;
+            *)
+                case $PX4_DEVICE in
+                    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+                    *)
+                        echo "Invalid PX4_DEVICE (expected 15 digits for $device_model): $PX4_DEVICE" >&2
+                        exit 2
+                        ;;
+                esac
+                ;;
+        esac
+    fi
 else
+    if [ -n "${PX4_INSTANCE:-}" ]; then
+        echo "PX4_MODEL is required with PX4_INSTANCE" >&2
+        exit 2
+    fi
     case $PX4_DEVICE in
         [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
             device_model=px_q3u4
@@ -125,6 +139,7 @@ slot=
 case $channel in
     T1[3-9]|T[2-5][0-9]|T6[0-2])
         physical_channel=${channel#T}
+        # shellcheck disable=SC2046
         if ! contains "$PX4_RECEIVER" $(t_receivers "$device_model"); then
             echo "Receiver $PX4_RECEIVER cannot receive terrestrial channel on $device_model: $channel" >&2
             exit 2
@@ -150,6 +165,7 @@ case $channel in
                 exit 2
                 ;;
         esac
+        # shellcheck disable=SC2046
         if ! contains "$PX4_RECEIVER" $(s_receivers "$device_model"); then
             echo "Receiver $PX4_RECEIVER cannot receive satellite channel on $device_model: $channel" >&2
             exit 2
@@ -167,6 +183,7 @@ case $channel in
                 exit 2
                 ;;
         esac
+        # shellcheck disable=SC2046
         if ! contains "$PX4_RECEIVER" $(s_receivers "$device_model"); then
             echo "Receiver $PX4_RECEIVER cannot receive satellite channel on $device_model: $channel" >&2
             exit 2
@@ -183,7 +200,7 @@ esac
 
 if [ "$system" = isdb-t ]; then
     exec "$px4_ts_bin" \
-        --device "$PX4_DEVICE" \
+        "$px4_target_option" "$px4_target_value" \
         --receiver "$PX4_RECEIVER" \
         --system "$system" \
         --frequency-khz "$frequency_khz" \
@@ -192,7 +209,7 @@ if [ "$system" = isdb-t ]; then
 fi
 
 exec "$px4_ts_bin" \
-    --device "$PX4_DEVICE" \
+    "$px4_target_option" "$px4_target_value" \
     --receiver "$PX4_RECEIVER" \
     --system "$system" \
     --frequency-khz "$frequency_khz" \
