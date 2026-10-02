@@ -128,6 +128,7 @@ RUN apt-get update \
         libusb-1.0-0 \
         libpcsclite1 \
         libccid \
+        procps \
         pcscd \
     && rm -rf /var/lib/apt/lists/*
 

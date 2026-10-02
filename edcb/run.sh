@@ -565,6 +565,84 @@ if ! collect_px4_plan; then
     exit 1
 fi
 
+# siano-ts --list はデバイスを開かずに対応 RIO チューナーを列挙する。
+# libusb の順番ではなく USB port path を BonDriver に渡し、抜き差しで
+# 列挙順が変わっても別の筐体を選ばない。Count に加える前に各機器を開き、
+# カーネルドライバー等で使えない状態では起動を止める。
+SIANO_LIST=/run/edcb-s1ud/list.txt
+SIANO_DEVICES_FILE=/run/edcb-s1ud/devices.txt
+SIANO_DEVICES=
+SIANO_SLOT_COUNT=0
+collect_siano_devices()
+{
+    if ! /usr/local/bin/siano-ts --list > "$SIANO_LIST" 2> /run/edcb-s1ud/list.err; then
+        if [ -s /run/edcb-s1ud/list.err ]; then
+            cat /run/edcb-s1ud/list.err >&2
+        fi
+        echo "Siano: siano-ts --list に失敗しました" >&2
+        return 1
+    fi
+    if [ -s /run/edcb-s1ud/list.err ]; then
+        cat /run/edcb-s1ud/list.err >&2
+    fi
+    if ! awk '
+        /^model=/ {
+            model = port = bus = address = status = receivers = ""
+            for (i = 1; i <= NF; i++) {
+                separator = index($i, "=")
+                if (!separator) continue
+                key = substr($i, 1, separator - 1)
+                value = substr($i, separator + 1)
+                if (key == "model") model = value
+                else if (key == "port") port = value
+                else if (key == "bus") bus = value
+                else if (key == "address") address = value
+                else if (key == "status") status = value
+                else if (key == "receivers") receivers = value
+            }
+            if (status != "ready") next
+            if (model != "PX-S1UD" && model != "Siano-Rio-0600" &&
+                model != "Siano-Rio-0302") { invalid = 1; next }
+            if (receivers != "1") { invalid = 1; next }
+            if (port != "" && port != "-") selector = port
+            else { invalid = 1; next }
+            if (selector !~ /^[0-9]+([-.:][0-9]+)*$/ || seen[selector]++) {
+                invalid = 1
+                next
+            }
+            print selector
+        }
+        END { if (invalid) exit 1 }
+    ' "$SIANO_LIST" > "$SIANO_DEVICES_FILE"; then
+        echo "Siano: 安全に選択できない列挙結果があるため EDCB を起動しません" >&2
+        return 1
+    fi
+    SIANO_SLOT_COUNT=$(awk 'END { print NR + 0 }' "$SIANO_DEVICES_FILE")
+    SIANO_DEVICES=$(paste -sd, "$SIANO_DEVICES_FILE")
+    if [ "$SIANO_SLOT_COUNT" -gt 0 ]; then
+        if [ ! -r /lib/firmware/isdbt_rio.inp ]; then
+            echo "Siano: ファームウェアがありません: /lib/firmware/isdbt_rio.inp" >&2
+            return 1
+        fi
+        printf 'quit\n' > /run/edcb-s1ud/probe.input
+        while IFS= read -r device; do
+            if ! /usr/local/bin/siano-ts --control --device "$device" \
+                --firmware /lib/firmware/isdbt_rio.inp \
+                < /run/edcb-s1ud/probe.input > /dev/null 2> /run/edcb-s1ud/probe.err; then
+                cat /run/edcb-s1ud/probe.err >&2
+                echo "Siano: USB チューナーを初期化できません: $device" >&2
+                return 1
+            fi
+        done < "$SIANO_DEVICES_FILE"
+    fi
+    echo "Siano enabled: adapters=$SIANO_SLOT_COUNT" >&2
+    return 0
+}
+
+if ! collect_siano_devices; then
+    exit 1
+fi
+
 if [ "$PX4_PLAN_AVAILABLE" -eq 1 ]; then
     if [ ! -r "$PX4_FIRMWARE" ]; then
         echo "PX4: ファームウェアがありません: $PX4_FIRMWARE" >&2
@@ -608,10 +686,12 @@ fi
 set_bondriver_count "BonDriver_Px4.so" "$PX4_SLOT_COUNT" 4
 set_bondriver_count "BonDriver_Px4_T.so" 0 4
 set_bondriver_count "BonDriver_Px4_S.so" 0 5
+set_bondriver_count "BonDriver_S1UD.so" "$SIANO_SLOT_COUNT" 0
 
 set_tvtest
 export PX4_RUNTIME_DIR
 export EDCB_PX4_SLOTS="$PX4_SLOTS"
+export EDCB_S1UD_DEVICES="$SIANO_DEVICES"
 # BonDriver_S1UD / _Px4 が recisdb を通すかどうか。decode=false なら素通し。
 export EDCB_DECODE=${DECODE}
 

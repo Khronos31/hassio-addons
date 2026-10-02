@@ -8,12 +8,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <chrono>
+#include <algorithm>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -80,6 +82,28 @@ struct Driver {
 };
 
 Driver* driver(void* p) { return static_cast<Driver*>(p); }
+
+std::vector<std::string> g_devices;
+
+void load_devices() {
+    const char* env = getenv("EDCB_S1UD_DEVICES");
+    if (env == nullptr) {
+        return;
+    }
+    const std::string value(env);
+    std::size_t start = 0;
+    while (start < value.size()) {
+        const std::size_t end = value.find(',', start);
+        const std::string device = value.substr(
+            start, end == std::string::npos ? std::string::npos : end - start);
+        start = end == std::string::npos ? value.size() : end + 1;
+        if (device.empty() || device.find_first_not_of("0123456789.-:") != std::string::npos ||
+            std::find(g_devices.begin(), g_devices.end(), device) != g_devices.end()) {
+            continue;
+        }
+        g_devices.push_back(device);
+    }
+}
 
 void store_ascii(uint16_t* dst, const char* src) {
     while (*src) {
@@ -181,7 +205,7 @@ int claim_adapter(Driver* d) {
 #endif
     }
     mkdir(lock_dir, 0755);
-    for (int adapter = 0; adapter < 8; adapter++) {
+    for (int adapter = 0; adapter < static_cast<int>(g_devices.size()); adapter++) {
         char path[1024];
         snprintf(path, sizeof path, "%s/%d.lock", lock_dir, adapter);
         int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
@@ -255,9 +279,11 @@ bool spawn_pipeline(Driver* d, const char* channel, bool decode) {
             close(from_decode[0]);
             close(from_decode[1]);
         }
-        char adapter[16];
-        snprintf(adapter, sizeof adapter, "%d", d->adapter);
-        setenv("PX_S1UD_ADAPTER", adapter, 1);
+        if (d->adapter < 0 || d->adapter >= static_cast<int>(g_devices.size())) {
+            _exit(1);
+        }
+        const std::string& device = g_devices[static_cast<std::size_t>(d->adapter)];
+        setenv("PX_S1UD_ADAPTER", device.c_str(), 1);
         setenv("PX_S1UD_FIRMWARE", "/lib/firmware/isdbt_rio.inp", 0);
         const char* bin = getenv("PX_S1UD_STREAM");
         if (bin == nullptr) {
@@ -462,6 +488,7 @@ Bon2 g_bon;
 extern "C" const Bon1* CreateBonStruct(void) {
     static int ready = 0;
     if (!ready) {
+        load_devices();
         init_names(&g_driver);
         memset(&g_bon, 0, sizeof g_bon);
         g_bon.base.ctx = &g_driver;
