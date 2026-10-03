@@ -22,13 +22,13 @@ PX4_RUNTIME_DIR=${PX4_RUNTIME_DIR:-/run/px4-userland}
 READER_TEMPLATE=${PX4_READER_TEMPLATE:-/usr/share/mirakc-addon/pcsc/reader.conf.d/px4-userland.conf.in}
 READER_CONFIG=${PX4_READER_CONFIG:-/etc/reader.conf.d/px4-userland.conf}
 PX4_IFD_LIBRARY=${PX4_IFD_LIBRARY:-/usr/lib/px4-userland/libpx4-userland-ifd.so}
-DETECT_BIN=${PX4_DETECT_BIN:-/usr/local/bin/px4-detect}
 PX4D_BIN=${PX4D_BIN:-/usr/local/bin/px4d}
 PX4CTL_BIN=${PX4CTL_BIN:-/usr/local/bin/px4ctl}
 PCSC_BIN=${PCSC_BIN:-/usr/sbin/pcscd}
 MIRAKC_BIN=${MIRAKC_BIN:-mirakc}
 SIANO_TS_BIN=${SIANO_TS_BIN:-siano-ts}
 EFFECTIVE_CONFIG_HELPER=${MIRAKC_EFFECTIVE_CONFIG_HELPER:-/usr/local/bin/generate-effective-config.py}
+PX4_PLAN_HELPER=${PX4_PLAN_HELPER:-/usr/local/bin/px4-plan.py}
 PROC_ROOT=${PROC_ROOT:-/proc}
 PX4_READY_TIMEOUT_SECONDS=${PX4_READY_TIMEOUT_SECONDS:-10}
 PX4_READY_POLL_INTERVAL_SECONDS=${PX4_READY_POLL_INTERVAL_SECONDS:-1}
@@ -40,14 +40,13 @@ case $PX4_READY_TIMEOUT_SECONDS in ''|*[!0-9]*) echo "PX4_READY_TIMEOUT_SECONDS 
 case $PX4_CHILD_STOP_TIMEOUT_SECONDS in ''|*[!0-9]*) echo "PX4_CHILD_STOP_TIMEOUT_SECONDS must be a non-negative integer" >&2; exit 2 ;; esac
 case $SIANO_WARMUP_TIMEOUT_SECONDS in ''|*[!0-9]*) echo "SIANO_WARMUP_TIMEOUT_SECONDS must be a non-negative integer" >&2; exit 2 ;; esac
 
-px4d_pid=
+px4d_pids=
 pcscd_pid=
 mirakc_pid=
 firmware_helper_pid=
-PX4_DEVICE=
-PX4_MODEL=
+PX4_PLAN=
+px4_plan_active=0
 q3u4_enabled=0
-px4_model=
 q3_firmware_error=
 reader_tmp=
 shutdown_requested=0
@@ -61,6 +60,12 @@ discard_reader_tmp()
         return 1
     fi
     reader_tmp=
+}
+
+remove_reader_configs()
+{
+    reader_config_dir=$(dirname "$READER_CONFIG") || return 1
+    rm -f "$READER_CONFIG" "$reader_config_dir"/px4-userland-*.conf
 }
 
 cleanup_tmp()
@@ -186,37 +191,48 @@ ensure_q3u4_firmware()
     return 0
 }
 
-detect_px4()
+# px4d --list-json を列挙の唯一の根拠にし、接続中の筐体と受信機の計画を作る。
+# 同じ model/serial の ready な筐体が複数ある場合や、candidate を残す
+# duplicate、incomplete、invalid な筐体は px4-plan.py が拒否する。
+collect_px4_plan()
 {
-    detector_stderr=$tmp_dir/px4-detector.err
-    if detection=$("$DETECT_BIN" 2>"$detector_stderr"); then
-        if [ -s "$detector_stderr" ]; then
-            cat "$detector_stderr" >&2
-        fi
-    else
-        if [ -s "$detector_stderr" ]; then
-            cat "$detector_stderr" >&2
-        fi
-        echo "PX4 disabled: device detection failed" >&2
+    if [ ! -x "$PX4D_BIN" ]; then
+        echo "PX4 disabled: px4d is unavailable" >&2
         return 1
     fi
-    PX4_MODEL=${detection%% *}
-    PX4_DEVICE=${detection#* }
-    case $PX4_MODEL in
-        px_q3u4|px_q3pe4|px_q3pe5|px_w3u4|px_mlt5pe|dtv02a_5ts_p|px_w3pe4|px_w3pe5|px_mlt8pe3|px_mlt8pe5|dtv02a_4ts_p|px_m1ur|px_s1ur|dtv03a_1tu|dtv02_1t1s_u|dtv02a_1t1s_u) ;;
-        *)
-            echo "PX4 disabled: detector returned an invalid model: $detection" >&2
-            return 1
-            ;;
-    esac
-    case $PX4_DEVICE in
-        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]|[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
-        *)
-            echo "PX4 disabled: detector returned an invalid device serial: $PX4_DEVICE" >&2
-            return 1
-            ;;
-    esac
+    if [ ! -r "$PX4_PLAN_HELPER" ]; then
+        echo "PX4 disabled: plan helper is missing or unreadable: $PX4_PLAN_HELPER" >&2
+        return 1
+    fi
+    px4_list_json=$tmp_dir/px4-list.json
+    px4_list_stderr=$tmp_dir/px4-list.err
+    if ! "$PX4D_BIN" --list-json >"$px4_list_json" 2>"$px4_list_stderr"; then
+        if [ -s "$px4_list_stderr" ]; then
+            cat "$px4_list_stderr" >&2
+        fi
+        echo "PX4 disabled: px4d --list-json failed" >&2
+        return 1
+    fi
+    if [ -s "$px4_list_stderr" ]; then
+        cat "$px4_list_stderr" >&2
+    fi
+    PX4_PLAN=$tmp_dir/px4-plan.txt
+    if ! python3 "$PX4_PLAN_HELPER" --list-json "$px4_list_json" --plan "$PX4_PLAN"; then
+        PX4_PLAN=
+        echo "PX4 disabled: px4d listing could not be turned into a safe plan" >&2
+        return 1
+    fi
     return 0
+}
+
+px4_slot_count()
+{
+    awk '$1 == "slot" { n++ } END { print n + 0 }' "$PX4_PLAN"
+}
+
+px4_first_terrestrial_slot()
+{
+    awk '$1 == "slot" && $7 ~ /T/ { print $4, $6, $2; exit }' "$PX4_PLAN"
 }
 
 escape_sed_replacement()
@@ -224,7 +240,7 @@ escape_sed_replacement()
     printf '%s' "$1" | sed 's/[\\&|]/\\&/g'
 }
 
-write_reader_config()
+write_reader_configs()
 {
     if ! reader_config_dir=$(dirname "$READER_CONFIG"); then
         echo "could not determine reader config directory: $READER_CONFIG" >&2
@@ -234,8 +250,8 @@ write_reader_config()
     # Do not leave a stale configuration active if any later preparation step
     # fails. This also removes a prior configuration when the parent directory
     # is currently unusable, as far as the filesystem permits.
-    if ! rm -f "$READER_CONFIG"; then
-        echo "could not remove existing reader config: $READER_CONFIG" >&2
+    if ! rm -f "$READER_CONFIG" "$reader_config_dir"/px4-userland-*.conf; then
+        echo "could not remove existing reader configs in: $reader_config_dir" >&2
         return 1
     fi
 
@@ -248,104 +264,146 @@ write_reader_config()
         return 1
     fi
 
-    # The temporary file is created beside the destination so rename is atomic
-    # on the same filesystem.
     if ! mkdir -p "$reader_config_dir"; then
         echo "could not create reader config directory: $reader_config_dir" >&2
         return 1
     fi
-    if ! reader_tmp=$(mktemp "$reader_config_dir/.px4-userland.conf.XXXXXX"); then
-        echo "could not create temporary reader config in: $reader_config_dir" >&2
-        return 1
-    fi
-
     if ! runtime_escaped=$(escape_sed_replacement "$PX4_RUNTIME_DIR"); then
         echo "could not escape PX4 runtime directory for reader config" >&2
-        discard_reader_tmp || :
-        return 1
-    fi
-    if ! serial_escaped=$(escape_sed_replacement "$PX4_DEVICE"); then
-        echo "could not escape PX4 device serial for reader config" >&2
-        discard_reader_tmp || :
         return 1
     fi
     if ! library_escaped=$(escape_sed_replacement "$PX4_IFD_LIBRARY"); then
         echo "could not escape IFD library path for reader config" >&2
-        discard_reader_tmp || :
-        return 1
-    fi
-    if ! sed \
-        -e "s|@PX4_RUNTIME_DIR@|$runtime_escaped|g" \
-        -e "s|@PX4_BASE_SERIAL@|$serial_escaped|g" \
-        -e "s|@PX4_IFD_LIBRARY@|$library_escaped|g" \
-        -e "s|@PX4_ACCESS@|user|g" \
-        "$READER_TEMPLATE" > "$reader_tmp"; then
-        echo "could not generate reader config from template: $READER_TEMPLATE" >&2
-        discard_reader_tmp || :
-        return 1
-    fi
-    if [ ! -s "$reader_tmp" ]; then
-        echo "generated reader config is empty: $READER_TEMPLATE" >&2
-        discard_reader_tmp || :
         return 1
     fi
 
-    grep_status=0
-    grep -Eq '@PX4_[A-Z_]+@' "$reader_tmp" || grep_status=$?
-    if [ "$grep_status" -eq 0 ]; then
-        echo "reader config contains an unreplaced PX4 placeholder: $READER_TEMPLATE" >&2
-        discard_reader_tmp || :
-        return 1
-    fi
-    if [ "$grep_status" -ne 1 ]; then
-        echo "could not validate generated reader config: $reader_tmp" >&2
-        discard_reader_tmp || :
-        return 1
-    fi
-    for reader_value in "$PX4_RUNTIME_DIR" "$PX4_DEVICE" "$PX4_IFD_LIBRARY"; do
-        grep_status=0
-        grep -Fq -- "$reader_value" "$reader_tmp" || grep_status=$?
-        if [ "$grep_status" -ne 0 ]; then
-            echo "reader config is missing a substituted value: $reader_value" >&2
+    # 筐体ごとに instance= の IFD reader を1つ登録する。serial が同じでも
+    # instance は機種名を含むため M1UR と S1UR を区別できる。
+    # The temporary file is created beside the destination so rename is atomic
+    # on the same filesystem.
+    while IFS=' ' read -r kind key name instance serial paths bridges; do
+        [ "$kind" = "enclosure" ] || continue
+        if ! instance_escaped=$(escape_sed_replacement "$instance"); then
+            echo "could not escape PX4 instance for reader config" >&2
+            return 1
+        fi
+        if ! reader_tmp=$(mktemp "$reader_config_dir/.px4-userland.conf.XXXXXX"); then
+            echo "could not create temporary reader config in: $reader_config_dir" >&2
+            return 1
+        fi
+        if ! sed \
+            -e "s|@PX4_RUNTIME_DIR@|$runtime_escaped|g" \
+            -e "s|@PX4_BASE_SERIAL@|$instance_escaped|g" \
+            -e "s|@PX4_IFD_LIBRARY@|$library_escaped|g" \
+            -e "s|@PX4_ACCESS@|user|g" \
+            -e "s|:device=|:instance=|" \
+            "$READER_TEMPLATE" > "$reader_tmp"; then
+            echo "could not generate reader config from template: $READER_TEMPLATE" >&2
             discard_reader_tmp || :
             return 1
         fi
-    done
-    if ! mv "$reader_tmp" "$READER_CONFIG"; then
-        echo "could not install generated reader config: $READER_CONFIG" >&2
-        discard_reader_tmp || :
-        return 1
-    fi
-    reader_tmp=
+        if [ ! -s "$reader_tmp" ]; then
+            echo "generated reader config is empty: $READER_TEMPLATE" >&2
+            discard_reader_tmp || :
+            return 1
+        fi
+
+        grep_status=0
+        grep -Eq '@PX4_[A-Z_]+@' "$reader_tmp" || grep_status=$?
+        if [ "$grep_status" -eq 0 ]; then
+            echo "reader config contains an unreplaced PX4 placeholder: $READER_TEMPLATE" >&2
+            discard_reader_tmp || :
+            return 1
+        fi
+        if [ "$grep_status" -ne 1 ]; then
+            echo "could not validate generated reader config: $reader_tmp" >&2
+            discard_reader_tmp || :
+            return 1
+        fi
+        for reader_value in "$PX4_RUNTIME_DIR" "instance=$instance" "$PX4_IFD_LIBRARY"; do
+            grep_status=0
+            grep -Fq -- "$reader_value" "$reader_tmp" || grep_status=$?
+            if [ "$grep_status" -ne 0 ]; then
+                echo "reader config is missing a substituted value: $reader_value" >&2
+                discard_reader_tmp || :
+                return 1
+            fi
+        done
+        if ! mv "$reader_tmp" "$reader_config_dir/px4-userland-$instance.conf"; then
+            echo "could not install generated reader config for: $instance" >&2
+            discard_reader_tmp || :
+            return 1
+        fi
+        reader_tmp=
+    done < "$PX4_PLAN"
 }
 
 start_px4d()
 {
-    echo "starting px4d: device=$PX4_DEVICE firmware=$Q3U4_FIRMWARE runtime=$PX4_RUNTIME_DIR" >&2
-    "$PX4D_BIN" \
-        --device "$PX4_DEVICE" \
-        --firmware "$Q3U4_FIRMWARE" \
-        --runtime-dir "$PX4_RUNTIME_DIR" &
+    instance=$1
+    serial=$2
+    bridges=$3
+    shift 3
+    echo "starting px4d: instance=$instance device=$serial usb-path=$* firmware=$Q3U4_FIRMWARE runtime=$PX4_RUNTIME_DIR" >&2
+    if [ "$bridges" = 2 ]; then
+        "$PX4D_BIN" \
+            --device "$serial" \
+            --usb-path "$1" \
+            --usb-path "$2" \
+            --instance "$instance" \
+            --firmware "$Q3U4_FIRMWARE" \
+            --runtime-dir "$PX4_RUNTIME_DIR" &
+    else
+        "$PX4D_BIN" \
+            --device "$serial" \
+            --usb-path "$1" \
+            --instance "$instance" \
+            --firmware "$Q3U4_FIRMWARE" \
+            --runtime-dir "$PX4_RUNTIME_DIR" &
+    fi
     px4d_pid=$!
+    px4d_pids="$px4d_pids $px4d_pid"
+    wait_px4_ready "$instance" "$bridges" "$px4d_pid"
+}
+
+start_all_px4d()
+{
+    while IFS=' ' read -r kind key name instance serial paths bridges; do
+        [ "$kind" = "enclosure" ] || continue
+        old_ifs=$IFS
+        IFS=,
+        # shellcheck disable=SC2086
+        set -- $paths
+        IFS=$old_ifs
+        echo "PX4 enclosure: profile=$key model=$name instance=$instance" >&2
+        if ! start_px4d "$instance" "$serial" "$bridges" "$@"; then
+            return 1
+        fi
+    done < "$PX4_PLAN"
+    return 0
 }
 
 wait_px4_ready()
 {
+    instance=$1
+    bridges=$2
+    pid=$3
     ready_deadline=$(($(date +%s) + PX4_READY_TIMEOUT_SECONDS))
     # 2ブリッジ機は usb-present-mask=0x03、1ブリッジ機は 0x01。
-    px4_usb_mask=0x01
-    case $PX4_MODEL in
-        px_q3u4|px_q3pe4|px_q3pe5) px4_usb_mask=0x03 ;;
-    esac
+    if [ "$bridges" = 2 ]; then
+        px4_usb_mask=0x03
+    else
+        px4_usb_mask=0x01
+    fi
     while :; do
-        if ! pid_is_alive "$px4d_pid"; then
-            echo "px4d exited before becoming ready" >&2
+        if ! pid_is_alive "$pid"; then
+            echo "px4d ($instance) exited before becoming ready" >&2
             return 1
         fi
 
         probe_status=0
         probe_output=$("$PX4CTL_BIN" \
-            --device "$PX4_DEVICE" \
+            --instance "$instance" \
             --runtime-dir "$PX4_RUNTIME_DIR" list 2>&1) || probe_status=$?
         if [ -n "$probe_output" ]; then
             printf '%s\n' "$probe_output" >&2
@@ -355,7 +413,7 @@ wait_px4_ready()
             $0 ~ ("(^|[[:space:]])usb-present-mask=" mask "([[:space:]]|$)") { found = 1 }
             END { exit found ? 0 : 1 }
         '; then
-            echo "px4d ready: device=$PX4_DEVICE" >&2
+            echo "px4d ready: instance=$instance" >&2
             return 0
         fi
 
@@ -363,7 +421,7 @@ wait_px4_ready()
         [ "$now" -ge "$ready_deadline" ] && break
         sleep "$PX4_READY_POLL_INTERVAL_SECONDS" || :
     done
-    echo "px4d ready timeout after ${PX4_READY_TIMEOUT_SECONDS}s: device=$PX4_DEVICE" >&2
+    echo "px4d ready timeout after ${PX4_READY_TIMEOUT_SECONDS}s: instance=$instance" >&2
     return 1
 }
 
@@ -463,8 +521,8 @@ generate_effective_config()
         --siano-list "$tmp_dir/siano-list.txt" \
         --warmup-file "$tmp_dir/siano-warmup.txt" \
         --q3u4-enabled "$q3u4_enabled"
-    if [ -n "$px4_model" ]; then
-        set -- "$@" --px4-model "$px4_model"
+    if [ "$px4_plan_active" -eq 1 ] && [ -n "$PX4_PLAN" ]; then
+        set -- "$@" --px4-plan "$PX4_PLAN"
     fi
     if ! python3 "$EFFECTIVE_CONFIG_HELPER" "$@"; then
         return 1
@@ -493,7 +551,9 @@ cleanup_children()
     # the Q3U4 card transport.
     stop_child "$mirakc_pid" mirakc
     stop_child "$pcscd_pid" pcscd
-    stop_child "$px4d_pid" px4d
+    for pid in $px4d_pids; do
+        stop_child "$pid" px4d
+    done
     cleanup_tmp
     exit "$status"
 }
@@ -531,36 +591,36 @@ if [ ! -r "$SIANO_FIRMWARE" ]; then
     exit 1
 fi
 
-if detect_px4; then
-    if ensure_q3u4_firmware; then
-        px4_model=$PX4_MODEL
-        export PX4_DEVICE PX4_MODEL PX4_RUNTIME_DIR
-        if ! write_reader_config; then
-            echo "PX4 setup failed: reader config/IFD preparation is fatal" >&2
-            exit 1
-        fi
-        echo "PX4 enabled: model=$px4_model device=$PX4_DEVICE firmware=$Q3U4_FIRMWARE" >&2
-        start_px4d
-        if ! wait_px4_ready; then
-            echo "px4d failed to start or become ready" >&2
-            exit 1
-        fi
-        q3u4_enabled=1
-    else
+if ! collect_px4_plan; then
+    remove_reader_configs || :
+    echo "PX4 enumeration failed; refusing to start without the detected PX4 tuners" >&2
+    exit 1
+fi
+
+px4_slots=$(px4_slot_count)
+if [ "$px4_slots" -gt 0 ]; then
+    if ! ensure_q3u4_firmware; then
         if [ "$shutdown_requested" -ne 0 ]; then
             exit 0
         fi
-        echo "PX4 disabled: $q3_firmware_error" >&2
-        PX4_DEVICE=
-        PX4_MODEL=
-        export PX4_DEVICE PX4_MODEL PX4_RUNTIME_DIR
-        rm -f "$READER_CONFIG"
+        echo "PX4 firmware preparation failed: $q3_firmware_error" >&2
+        exit 1
     fi
+    if ! write_reader_configs; then
+        echo "PX4 setup failed: reader config/IFD preparation is fatal" >&2
+        exit 1
+    fi
+    export PX4_RUNTIME_DIR
+    if ! start_all_px4d; then
+        echo "px4d failed to start or become ready" >&2
+        exit 1
+    fi
+    px4_plan_active=1
+    q3u4_enabled=1
+    echo "PX4 enabled: enclosures=$(awk '$1 == "enclosure" { n++ } END { print n + 0 }' "$PX4_PLAN") slots=$px4_slots firmware=$Q3U4_FIRMWARE" >&2
 else
-    PX4_DEVICE=
-    PX4_MODEL=
-    export PX4_DEVICE PX4_MODEL PX4_RUNTIME_DIR
-    rm -f "$READER_CONFIG"
+    echo "PX4 disabled: no supported enclosure is ready" >&2
+    remove_reader_configs || :
 fi
 
 echo "設定: ${USER_CFG}" >&2
@@ -580,8 +640,18 @@ scan_gr_channels()
 }
 
 if [ "$first_boot" -eq 1 ]; then
-    if [ -n "$PX4_DEVICE" ] && [ -n "$px4_model" ]; then
-        scan_gr_channels --px4-bin /usr/local/bin/px4-ts-stream --px4-model "$px4_model"
+    scan_slot=
+    if [ "$px4_plan_active" -eq 1 ]; then
+        scan_slot=$(px4_first_terrestrial_slot)
+    fi
+    if [ -n "$scan_slot" ]; then
+        old_ifs=$IFS
+        IFS=' '
+        # shellcheck disable=SC2086
+        set -- $scan_slot
+        IFS=$old_ifs
+        scan_gr_channels --px4-bin /usr/local/bin/px4-ts-stream \
+            --px4-instance "$1" --px4-receiver "$2" --px4-model "$3"
     elif [ -s "$tmp_dir/siano-list.txt" ]; then
         scan_gr_channels --siano-bin /usr/local/bin/px-s1ud-stream --siano-adapter 0
     fi
@@ -616,9 +686,11 @@ while :; do
         echo "pcscd exited unexpectedly" >&2
         exit 1
     fi
-    if [ -n "$px4d_pid" ] && ! pid_is_alive "$px4d_pid"; then
-        echo "px4d exited unexpectedly" >&2
-        exit 1
-    fi
+    for pid in $px4d_pids; do
+        if [ -n "$pid" ] && ! pid_is_alive "$pid"; then
+            echo "px4d exited unexpectedly (pid=$pid)" >&2
+            exit 1
+        fi
+    done
     sleep "$PX4_MONITOR_INTERVAL_SECONDS" || :
 done

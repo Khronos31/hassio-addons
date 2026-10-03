@@ -172,6 +172,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--px4-bin")
     parser.add_argument("--px4-model")
+    parser.add_argument("--px4-instance")
+    parser.add_argument("--px4-receiver")
     parser.add_argument("--siano-bin")
     parser.add_argument("--siano-adapter", default="0")
     parser.add_argument("--arib-bin", default=os.environ.get("MIRAKC_ARIB", "mirakc-arib"))
@@ -182,13 +184,18 @@ def main() -> int:
 
     env = os.environ.copy()
     if args.px4_bin and args.px4_model:
-        receiver = PX4_GR_RECEIVER.get(args.px4_model)
+        receiver = args.px4_receiver
+        if receiver is None:
+            receiver = PX4_GR_RECEIVER.get(args.px4_model)
         if receiver is None:
             print(f"unknown px4 model: {args.px4_model}", file=sys.stderr)
             return 2
         args.stream_cmd = [args.px4_bin]
         env["PX4_PROFILE"] = args.px4_model
+        env["PX4_MODEL"] = args.px4_model
         env["PX4_RECEIVER"] = str(receiver)
+        if args.px4_instance:
+            env["PX4_INSTANCE"] = args.px4_instance
     elif args.siano_bin:
         args.stream_cmd = [args.siano_bin]
         env["PX_S1UD_ADAPTER"] = args.siano_adapter

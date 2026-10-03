@@ -8,6 +8,7 @@ USER root
 
 COPY px-s1ud-stream px4-detect px4-ts-stream /usr/local/bin/
 COPY generate-effective-config.py /usr/local/bin/generate-effective-config.py
+COPY px4-plan.py /usr/local/bin/px4-plan.py
 COPY gr-scan.py /usr/local/bin/gr-scan.py
 COPY firmware-allowlist.txt px4-firmware-source.tsv /usr/share/mirakc-addon/
 COPY px4-acquire-firmware /usr/local/bin/px4-acquire-firmware
@@ -16,10 +17,10 @@ COPY config.yml.template /usr/share/mirakc-addon/config.yml.template
 COPY LICENCE.siano /usr/share/doc/isdbt_rio.LICENCE.siano
 
 RUN set -eux; \
-    siano_tag_object='5e584d18f95884362b4df6cf02c8215fb02b551b'; \
-    siano_resolved_commit='ad9bc7361288e9c188a1d8235ab946ac8b7bd6ac'; \
-    px4_tag_object='0c72e5281252b412879c527f637b9da39cb85f58'; \
-    px4_resolved_commit='3477301c09578d6c0d85f381c1448a5c53157a68'; \
+    siano_tag_object='6e68693b11a5f7918ce86e086b386ed47d4cb375'; \
+    siano_resolved_commit='d1f4e42810d5a2023ff4a6c31f798cb381026693'; \
+    px4_tag_object='cf38742618bb02db41a95def619fbff50e9eb0f3'; \
+    px4_resolved_commit='cf38742618bb02db41a95def619fbff50e9eb0f3'; \
     fwtool_version='v0.2.1'; \
     fwtool_commit='2b3f79b5bc5db56e8556bb28397f7d8f74b2adeb'; \
     recisdb_deb='https://github.com/kazuki0824/recisdb-rs/releases/download/1.2.4/recisdb_1.2.4-1_amd64.deb'; \
@@ -51,7 +52,6 @@ RUN set -eux; \
     git init -q /tmp/px4; \
     git -C /tmp/px4 remote add origin https://github.com/Khronos31/px4-userland.git; \
     git -C /tmp/px4 fetch -q --no-tags --depth 1 origin "$px4_tag_object"; \
-    test "$(git -C /tmp/px4 cat-file -t "$px4_tag_object")" = tag; \
     test "$(git -C /tmp/px4 rev-parse "$px4_tag_object")" = "$px4_tag_object"; \
     test "$(git -C /tmp/px4 rev-parse "$px4_tag_object^{commit}")" = "$px4_resolved_commit"; \
     git -C /tmp/px4 checkout -q --detach "$px4_resolved_commit"; \
@@ -93,7 +93,7 @@ RUN set -eux; \
     install -m 0644 /tmp/px4-drv/fwtool/fwinfo.tsv \
         /usr/libexec/mirakc-addon/px4-fwtool/fwinfo.tsv; \
     install -D -m 0644 /tmp/px4-drv/LICENSE /usr/share/doc/px4_drv-fwtool/LICENSE; \
-    chmod 0755 /run.sh /usr/local/bin/px-s1ud-stream /usr/local/bin/px4-detect /usr/local/bin/px4-ts-stream /usr/local/bin/generate-effective-config.py /usr/local/bin/px4-acquire-firmware /usr/local/bin/gr-scan.py; \
+    chmod 0755 /run.sh /usr/local/bin/px-s1ud-stream /usr/local/bin/px4-detect /usr/local/bin/px4-ts-stream /usr/local/bin/generate-effective-config.py /usr/local/bin/px4-plan.py /usr/local/bin/px4-acquire-firmware /usr/local/bin/gr-scan.py; \
     dpkg-query -W -f='${binary:Package}\t${Version}\n' | LC_ALL=C sort \
         > /usr/share/mirakc-addon/build-package-versions.txt; \
     { \
@@ -136,6 +136,7 @@ RUN set -eux; \
             'build_package_versions=/usr/share/mirakc-addon/build-package-versions.txt' \
             'runtime_package_versions=/usr/share/mirakc-addon/runtime-package-versions.txt' \
             'effective_config_helper=/usr/local/bin/generate-effective-config.py' \
+            'px4_plan_helper=/usr/local/bin/px4-plan.py' \
             'effective_config_parser=python3-yaml' \
             'px4_ifd_library=/usr/lib/px4-userland/libpx4-userland-ifd.so' \
             'px4_reader_template=/usr/share/mirakc-addon/pcsc/reader.conf.d/px4-userland.conf.in'; \

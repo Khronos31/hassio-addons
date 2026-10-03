@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.4.87.3
+
+- 同梱の px4-userland と siano-userland を v0.1.9 へ更新
+- PX4 複数筐体を自動列挙し、個体ごとに px4d と内蔵 PC/SC reader を起動
+- M1UR/S1UR の共有 serial は USB path と instance で区別し、全受信機を mirakc に自動登録
+- PX4 の列挙や個体特定が不完全な場合は、一部の筐体を除外して続行せず起動を停止
+- mirakc の Siano 一覧解析を siano-userland v0.1.9 の key=value 形式に対応
+- 検出した Siano アダプターごとに地デジチューナー定義を自動生成
+
 ## 3.4.87.2
 
 - PX4 非検出（S1UD のみ）の環境で `generate-effective-config.py` へ空の `--px4-model` を渡し、effective config の生成に失敗していた問題を修正（`--px4-model` は PX4 検出時のみ渡す）
