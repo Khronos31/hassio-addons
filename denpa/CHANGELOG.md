@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.29.0.1
+
+- 上流 danything/denpa を 1.28.0 から 1.29.0 に更新
+- 同一シリアルの PX-M1UR / PX-S1UR の識別と BS/CS 標準局の登録を上流へ移し、アドオン側の px4 ラッパー・seed・jq 起動処理を削除
+- 公式 AIO イメージを継承するだけの Dockerfile に縮小
+- 録画先を `/media/DTV/denpa/recorded`・`library` から `raw`・`encoded` へ変更。既存ファイルは自動移動されず、DBの録画パスは起動時のマイグレーションで相対パスに書き換わる。録画のある環境では事前にDBをバックアップし、録画ファイルを新しい保存先へ移すこと
+- `SYS_RESOURCE` は維持。HAOS実機では権限なしでpipeサイズの8MiB要求と1MiB fallbackがともに失敗した例がある
+
 ## 1.28.0.2
 
 - 初回起動時にアドオン側で BS/CS 標準チャンネルをシード（無ければ作成し、既存種別は残して不足する種別だけ追記）。壊れた channels.json は上書きしない
