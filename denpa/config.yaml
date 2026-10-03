@@ -1,7 +1,7 @@
 name: denpa
-version: "1.29.0.1"
+version: "1.29.1.1"
 slug: denpa
-description: "danything/denpa 1.29.0。PX4の同一シリアル筐体にも対応。BS/CS標準局を自動登録。EDCBやmirakcと同時にUSBは開かない。"
+description: "danything/denpa 1.29.1。PX4の同一シリアル筐体にも対応。BS/CS標準局を自動登録。EDCBやmirakcと同時にUSBは開かない。"
 url: https://github.com/danything/denpa
 arch:
   - amd64

@@ -1,6 +1,6 @@
 # denpa
 
-[danything/denpa](https://github.com/danything/denpa) 1.29.0 の Home Assistant 向けアドオンである。上流公式の AIO イメージを使い、選局を担うチューナーエージェントと、UI や録画を担う本体を同一コンテナ内で動かす。
+[danything/denpa](https://github.com/danything/denpa) 1.29.1 の Home Assistant 向けアドオンである。上流公式の AIO イメージを使い、選局を担うチューナーエージェントと、UI や録画を担う本体を同一コンテナ内で動かす。
 
 チューナーを挿して起動すれば、そのまま使える自宅用テレビ録画サーバである。設定ファイルは1行も書く必要がない。番組表・予約・録画・ブラウザ再生を1つにまとめ、Mirakurun や EDCB を別に立てる必要がない。
 
@@ -59,4 +59,5 @@
 - **他ソフトウェアとの同時起動禁止**: EDCB / mirakc / EPGStation と同時に起動しないこと（同じ USB チューナーやカードリーダーを取り合うため）。
 - **PX-S1UD の受信範囲**: PX-S1UD は地上波（GR）のみ対応である。BS/CS 放送を受信する場合は px4-userland 対応機種を使用すること。
 - **同じ USB シリアルの複数台**: PX-M1UR / PX-S1UR などシリアルが重複する機種は、上流 denpa が USB 接続位置ごとに別の筐体として認識する。同じシリアルの筐体を同時に使う場合は、それぞれ別の USB ポートへ接続すること。
+- **pipe の拡張権限**: `SYS_RESOURCE` を付与している。HAOSではこの権限が無いと、pipe の8MiB要求と1MiB fallbackの両方が失敗する場合がある。v1.29.1では失敗時のサイズと原因の手掛かりがログに出る。
 - **v1.29.0 への更新**: 保存先が `recorded` / `library` から `raw` / `encoded` に変わる。既存録画ファイルは自動移動されず、DBの録画パスは起動時に相対パスへ書き換わる。録画がある場合は、更新前に `/data/denpa.db` をバックアップし、ファイルを新しい保存先へ移すこと。`MEDIA_DIR` は `/media/DTV/denpa` に設定済み。

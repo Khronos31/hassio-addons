@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.29.1.1
+
+- 上流 danything/denpa を 1.29.0 から 1.29.1 に更新
+- pipe を 8MiB にも1MiBにも広げられなかったとき、現在のpipeサイズと uid ごとの上限に関する手掛かりを agent のログに出す上流修正を取り込み
+- HAOSで必要だった `SYS_RESOURCE` は引き続き付与
+
 ## 1.29.0.1
 
 - 上流 danything/denpa を 1.28.0 から 1.29.0 に更新
