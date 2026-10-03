@@ -1,6 +1,6 @@
 # denpa
 
-[danything/denpa](https://github.com/danything/denpa) 1.22.1 の Home Assistant 向けアドオン（amd64）。チューナーエージェントと本体を同一コンテナで動かす。
+[danything/denpa](https://github.com/danything/denpa) 1.28.0 の Home Assistant 向けアドオン（amd64）。上流公式の AIO イメージを使い、チューナーエージェントと本体を同一コンテナで動かす。
 
 チューナーを USB に挿して起動するだけでそのまま使える自宅用テレビ録画サーバである。設定ファイルは1行も書く必要がなく、番組表・予約・録画・ブラウザ再生を1つにまとめ、Mirakurun や EDCB を別に立てる必要がない。
 
@@ -10,7 +10,8 @@
 - **オールインワン**: 番組表、ルールによるキーワード自動予約、ライブ視聴（追っかけ再生・字幕・データ放送対応）、CM 自動チャプター付き録画（AV1 / H.264 の mkv）、ブラウザでの CM スキップ再生を単体で完結。
 - **ホストドライバ不要**: px4-userland および siano-userland を同梱。ホスト OS へのドライバ導入は不要。
 - **USB チューナー自動検出**: PLEX や e-Better などの px4-userland 対応機種、および PX-S1UD（地上波のみ）に対応。刺さっていれば自動で見つける。※ Linux DVB（PT2/PT3 など）は非対応。
-- **B-CAS 対応**: USB CCID リーダーおよび PX-Q3U4 内蔵カードリーダーに対応。スマートカードデーモン（pcscd）はアドオンが自動で起動・設定。
+- **同一シリアル筐体の個別認識**: PX-M1UR / PX-S1UR など USB シリアルが重複する機種も、接続位置ごとに別の筐体として扱う。
+- **B-CAS 対応**: USB CCID リーダーおよび PX-Q3U4 内蔵カードリーダーに対応。B-CAS 読み取りは denpa-agent の内蔵実装で行う。
 - **多彩な再生方法**: ブラウザでの視聴のほか、テレビ（Android TV / Fire TV）の VLC への転送や、外部プレイヤー用リンクのコピーにも対応。
 
 ## 注意事項

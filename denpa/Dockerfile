@@ -1,26 +1,29 @@
-# danything/denpa 1.24.0。本体とチューナーエージェントを1つのアドオンで動かす。
-# Q3U4 / MLT5 / DTV02A などはエージェント側の px4-userland。
-# 1.23.0 から B25 復号とカードリーダーはエージェント内蔵 (pcscd はエージェントが
-# 自分で起こす。libccid は要らない — USB カードリーダーは usbfs 直叩き)。
-ARG DENPA_VERSION=1.24.0
-FROM ghcr.io/danything/denpa-agent:${DENPA_VERSION} AS agent
-FROM ghcr.io/danything/denpa:${DENPA_VERSION}
+# danything/denpa 1.28.0 の公式 AIO イメージ。本体とチューナーエージェントを
+# 上流が対応を合わせて1コンテナにまとめ、HAOS アドオン向けに提供している。
+ARG DENPA_VERSION=1.28.0
+FROM ghcr.io/danything/denpa-aio:${DENPA_VERSION}
 
 USER root
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates pcscd pcsc-tools tzdata libusb-1.0-0 procps jq \
-    && curl -fsSL -o /tmp/libaribb25.deb \
-        https://github.com/tsukumijima/libaribb25/releases/download/v0.2.10/libaribb25_0.2.10_amd64.deb \
-    && apt-get install -y --no-install-recommends /tmp/libaribb25.deb \
-    && rm -rf /var/lib/apt/lists/* /tmp/libaribb25.deb
+    && apt-get install -y --no-install-recommends curl ca-certificates procps tzdata jq python3 \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=agent /usr/local/bin/denpa-agent /usr/local/bin/denpa-agent
-COPY --from=agent /opt/px4-userland /opt/px4-userland
-COPY --from=agent /opt/siano-userland /opt/siano-userland
-COPY run.sh /run.sh
-COPY ingress.js /ingress.js
+# PX-M1UR / PX-S1UR のように同じ USB シリアルを名乗る筐体を denpa が個別に
+# 扱えるよう、px4d / px4ctl を互換ラッパーへ差し替える。実体は別ディレクトリに
+# 残し、ファームウェアと物理デバイスの経路は変えない。
+COPY px4-compat/px4-wrapper.py /opt/px4-compat/px4-wrapper.py
+RUN mkdir -p /opt/px4-compat-real \
+    && mv /opt/px4-userland/px4d /opt/px4-compat-real/px4d \
+    && mv /opt/px4-userland/px4ctl /opt/px4-compat-real/px4ctl \
+    && cp /opt/px4-compat/px4-wrapper.py /opt/px4-userland/px4d \
+    && cp /opt/px4-compat/px4-wrapper.py /opt/px4-userland/px4ctl \
+    && chmod 755 /opt/px4-userland/px4d /opt/px4-userland/px4ctl
+
+# BS/CS の標準チャンネル一覧。初回起動の seed に使う (地上波はスキャンで拾う)。
 COPY seed/channels.bs.json /usr/share/denpa-addon/channels.bs.json
-RUN chmod 755 /run.sh /usr/local/bin/denpa-agent
+
+COPY run.sh /run.sh
+RUN chmod 755 /run.sh
 
 WORKDIR /app
 ENTRYPOINT []
