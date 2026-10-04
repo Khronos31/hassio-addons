@@ -134,10 +134,10 @@ def emit_channels(found: list) -> str:
 
 
 def replace_gr_channels(config_path: str, found: list) -> bool:
-    """config.yml の channels 先頭の GR ブロックを走査結果で差し替える。
+    """config.yml の先頭の GR ブロックを走査結果で差し替える。
 
-    テンプレートの GR ブロックは channels: の直後から最初の type: BS/CS の
-    直前まで。コメントや BS/CS 以降は触らない。
+    既存 GR ブロックがなければ、最初の BS/CS 項目の直前へ走査結果を挿入する。
+    BS/CS 以降は触らない。
     """
     from pathlib import Path
 
@@ -148,22 +148,29 @@ def replace_gr_channels(config_path: str, found: list) -> bool:
         start = next(i for i, line in enumerate(lines) if line.startswith("channels:")) + 1
     except StopIteration:
         return False
-    end = None
+    first_satellite_type = None
     for i in range(start, len(lines)):
         stripped = lines[i].strip()
         if stripped in ("type: BS", "type: CS", "type: SKY"):
-            end = i - 2  # そのエントリの name 行の前まで
+            first_satellite_type = i
             break
-    if end is None or end < start:
+    if first_satellite_type is None:
         return False
     block = []
     for channel, services in found:
         block.append(f"  - name: {channel_name(services)}")
         block.append("    type: GR")
         block.append(f"    channel: {channel}")
-    # end は最後の GR エントリの channel 行を指す。その次（最初の BS/CS の
-    # name 行）から後を残す。
-    new_lines = lines[:start] + block + lines[end + 1:]
+    first_satellite_name = first_satellite_type - 1
+    has_gr_seed = any(
+        lines[i].strip() == "type: GR" for i in range(start, first_satellite_name)
+    )
+    if has_gr_seed:
+        # 最初の衛星局の name 行より前が既存のGRシード。
+        new_lines = lines[:start] + block + lines[first_satellite_name:]
+    else:
+        # GRシードなしのテンプレートには、BS/CS局を残して走査結果を挿入。
+        new_lines = lines[:first_satellite_name] + block + lines[first_satellite_name:]
     path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
     return True
 

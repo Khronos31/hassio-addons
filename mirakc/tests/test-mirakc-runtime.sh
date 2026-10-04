@@ -510,7 +510,7 @@ wait_for_file "$case_dir/stubs/pcscd.pid" 'two Siano pcscd start'
 wait_for_file "$case_dir/stubs/mirakc.pid" 'two Siano mirakc start'
 assert_equal 2 "$(grep -c 'PX-S1UD #' "$case_dir/app-dir/config.yml")" 'two Siano retained count'
 assert_equal 0 "$(grep -c 'PX-Q3U4 #' "$case_dir/app-dir/config.yml" || :)" 'Q3U4 removed count'
-assert_equal 11 "$(grep -c '^  type: GR$' "$case_dir/app-dir/config.yml")" 'two Siano retained GR channels'
+assert_equal 0 "$(grep -c '^  type: GR$' "$case_dir/app-dir/config.yml")" 'no fixed GR seed channels'
 assert_equal 0 "$(grep -c '^  type: BS$' "$case_dir/app-dir/config.yml" || :)" 'two Siano removed BS channels'
 assert_equal 0 "$(grep -c '^  type: CS$' "$case_dir/app-dir/config.yml" || :)" 'two Siano removed CS channels'
 actual_warmup_devices=$(awk -F '\t' '$1 == "siano-warmup" && $4 == "--device" {print $5}' "$case_dir/events.log")

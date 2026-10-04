@@ -146,7 +146,7 @@ run_helper "$base" "$q3_zero" "$q3_zero_list" "$tmp_dir/q3-zero.warmup" 1 "$tmp_
     fail 'Q3U4 plus zero Siano generation failed'
 [ -f "$q3_zero" ] && [ ! -L "$q3_zero" ] || fail 'effective config is not a regular file'
 assert_tuners "$q3_zero" 0 8 1 'Q3U4 plus zero Siano tuner counts'
-assert_channels "$q3_zero" 11 1 1 'Q3U4 plus zero Siano channel counts'
+assert_channels "$q3_zero" 0 1 1 'Q3U4 plus zero Siano channel counts'
 [ ! -s "$tmp_dir/q3-zero.warmup" ] || fail 'zero Siano case warmed an adapter'
 assert_equal_hash=$(sha256sum "$base" | awk '{print $1}')
 [ "$q3_zero_hash" = "$assert_equal_hash" ] || fail 'user config changed in zero Siano case'
@@ -163,7 +163,7 @@ EOF
 run_helper "$base" "$q3_absent" "$q3_absent_list" "$tmp_dir/q3-absent.warmup" 0 "$tmp_dir/q3-absent.log" || \
     fail 'Q3U4 absent plus two Siano generation failed'
 assert_tuners "$q3_absent" 2 0 1 'Q3U4 absent tuner counts'
-assert_channels "$q3_absent" 11 0 0 'Q3U4 absent channel counts'
+assert_channels "$q3_absent" 0 0 0 'Q3U4 absent channel counts'
 actual_warmup=$(cat "$tmp_dir/q3-absent.warmup")
 expected_warmup=$(printf '0\n1')
 [ "$actual_warmup" = "$expected_warmup" ] || fail 'both retained Siano adapters were not selected for warmup'
@@ -183,8 +183,8 @@ mlt_one=$tmp_dir/mlt-one.yml
 run_helper "$base" "$mlt_one" "$q3_zero_list" "$tmp_dir/mlt-one.warmup" 1 "$tmp_dir/mlt-one.log" mlt5 || \
     fail 'MLT5 plus zero Siano generation failed'
 assert_tuners "$mlt_one" 0 5 1 'MLT5 plus zero Siano tuner counts'
-assert_channels "$mlt_one" 11 1 1 'MLT5 plus zero Siano channel counts'
-assert_channels "$q3_one" 11 1 1 'Q3U4 plus one Siano channel counts'
+assert_channels "$mlt_one" 0 1 1 'MLT5 plus zero Siano channel counts'
+assert_channels "$q3_one" 0 1 1 'Q3U4 plus one Siano channel counts'
 actual_warmup=$(cat "$tmp_dir/q3-one.warmup")
 [ "$actual_warmup" = 0 ] || fail 'only retained Siano adapter 0 was not selected for warmup'
 
@@ -192,7 +192,7 @@ q3_rejected=$tmp_dir/q3-rejected.yml
 run_helper "$base" "$q3_rejected" "$q3_zero_list" "$tmp_dir/q3-rejected.warmup" 0 "$tmp_dir/q3-rejected.log" || \
     fail 'firmware rejection case generation failed'
 assert_tuners "$q3_rejected" 0 0 1 'Q3U4 firmware rejection tuner counts'
-assert_channels "$q3_rejected" 11 0 0 'Q3U4 firmware rejection channel counts'
+assert_channels "$q3_rejected" 0 0 0 'Q3U4 firmware rejection channel counts'
 
 custom_satellite=$tmp_dir/custom-satellite.yml
 cp "$base" "$custom_satellite"
@@ -214,7 +214,7 @@ PY
 run_helper "$custom_satellite" "$tmp_dir/custom-satellite.effective.yml" "$q3_zero_list" \
     "$tmp_dir/custom-satellite.warmup" 0 "$tmp_dir/custom-satellite.log" || \
     fail 'custom BS/CS tuner generation failed'
-assert_channels "$tmp_dir/custom-satellite.effective.yml" 11 1 1 \
+assert_channels "$tmp_dir/custom-satellite.effective.yml" 0 1 1 \
     'custom BS/CS tuner channel counts'
 
 arbitrary_channel=$tmp_dir/arbitrary-channel.yml
@@ -233,7 +233,7 @@ PY
 run_helper "$arbitrary_channel" "$tmp_dir/arbitrary-channel.effective.yml" "$q3_zero_list" \
     "$tmp_dir/arbitrary-channel.warmup" 1 "$tmp_dir/arbitrary-channel.log" || \
     fail 'unsupported channel generation failed'
-assert_channels "$tmp_dir/arbitrary-channel.effective.yml" 11 1 1 \
+assert_channels "$tmp_dir/arbitrary-channel.effective.yml" 0 1 1 \
     'unsupported channel counts'
 if grep -Fq 'unsupported channel' "$tmp_dir/arbitrary-channel.effective.yml"; then
     fail 'unsupported channel type was retained without a matching tuner'

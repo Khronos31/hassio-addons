@@ -635,7 +635,7 @@ scan_gr_channels()
     if python3 /usr/local/bin/gr-scan.py "$@" --replace-config "$USER_CFG"; then
         echo "地上波チャンネルを走査結果で更新しました。" >&2
     else
-        echo "地上波スキャンに失敗したため、テンプレートの関東チャンネルのまま続行します。" >&2
+        echo "地上波スキャンに失敗したため、GRチャンネル設定は変更しません。" >&2
     fi
 }
 
