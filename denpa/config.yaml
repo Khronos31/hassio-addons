@@ -1,7 +1,7 @@
 name: denpa
-version: "1.38.0.1"
+version: "1.39.0.1"
 slug: denpa
-description: "danything/denpa 1.38.0。PX4の同一シリアル筐体にも対応。BS/CS標準局を自動登録。EDCBやmirakcと同時にUSBは開かない。"
+description: "danything/denpa 1.39.0。PX4の同一シリアル筐体にも対応。BS/CS標準局を自動登録。EDCBやmirakcと同時にUSBは開かない。"
 url: https://github.com/danything/denpa
 arch:
   - amd64
@@ -26,6 +26,11 @@ environment:
   # HA Supervisor が Ingress の前段となる。X-Forwarded-For はこのIPからだけ信頼する。
   TRUSTED_PROXIES: 172.30.32.2/32
   SHUTDOWN_WAIT: "15000"
+# denpa-tv 等の直接接続用。既定のホスト側ポートは構成タブで変更できる。
+ports:
+  3000/tcp: 3000
+ports_description:
+  3000/tcp: "denpa-tv などLAN内クライアント向け HTTP API"
 # 上流の server.js が HA Ingress の接頭辞にも対応し、WebSocket も受ける。
 # /api/hassio_ingress/<token>/ の下で denpa 本体へ直接つなぐ。
 ingress: true

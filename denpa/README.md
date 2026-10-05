@@ -1,6 +1,6 @@
 # denpa
 
-[danything/denpa](https://github.com/danything/denpa) 1.38.0 の Home Assistant 向けアドオン（amd64）。上流公式の AIO イメージを使い、チューナーエージェントと本体を同一コンテナで動かす。
+[danything/denpa](https://github.com/danything/denpa) 1.39.0 の Home Assistant 向けアドオン（amd64）。上流公式の AIO イメージを使い、チューナーエージェントと本体を同一コンテナで動かす。
 
 チューナーを USB に挿して起動するだけでそのまま使える自宅用テレビ録画サーバである。設定ファイルは1行も書く必要がなく、番組表・予約・録画・ブラウザ再生を1つにまとめ、Mirakurun や EDCB を別に立てる必要がない。
 
@@ -14,6 +14,7 @@
 - **BS/CS自動登録**: BS/CS標準チャンネルを上流 denpa が局一覧の取り込み時に種別ごとに登録する。
 - **B-CAS 対応**: USB CCID リーダーおよび PX-Q3U4 内蔵カードリーダーに対応。B-CAS 読み取りは denpa-agent の内蔵実装で行う。
 - **再生**: ブラウザで録画・ライブ・追っかけ再生を視聴できる。ライブ視聴では音声を選べ、Chrome / Edge では映像と字幕の PiP に対応。
+- **denpa-tv**: LAN内の Android TV / Google TV から直接接続できる。既定のホストポートは TCP 3000（構成タブで変更可能）。
 
 ## 注意事項
 
