@@ -1,1 +1,1 @@
-FROM ghcr.io/danything/denpa-aio:1.29.1
+FROM ghcr.io/danything/denpa-aio:1.38.0

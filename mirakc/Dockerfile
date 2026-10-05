@@ -2,7 +2,7 @@
 # The Q3U4 vendor archive is never included.  At runtime a pinned GPL fwtool
 # derives the firmware into the persistent add-on config volume after every
 # input and output has passed the pinned size/SHA-256 manifest.
-FROM docker.io/mirakc/mirakc:3.4.87-debian@sha256:aefb82fafa144e0f4878075dab101852f9b4c374ad0dc52fe8594368ddc15d5c
+FROM docker.io/mirakc/mirakc:3.4.88-debian@sha256:c2e4e13bfc510a3ab0fd02f6822adc2f6005b355e0a06d87cf4f3b36ff154900
 
 USER root
 
@@ -99,7 +99,7 @@ RUN set -eux; \
     { \
         printf '%s\n' \
             'manifest_version=1' \
-            'base_image=docker.io/mirakc/mirakc:3.4.82-debian@sha256:26af4e0bdec9b0ef1e967c008cc5884b9daf978a3f556d7d3d19efcba4f4c140' \
+            'base_image=docker.io/mirakc/mirakc:3.4.88-debian@sha256:c2e4e13bfc510a3ab0fd02f6822adc2f6005b355e0a06d87cf4f3b36ff154900' \
             'siano_repository=https://github.com/Khronos31/siano-userland.git' \
             "siano_tag_object=$siano_tag_object" \
             "siano_resolved_commit=$siano_resolved_commit" \
