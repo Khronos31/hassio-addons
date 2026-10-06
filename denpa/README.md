@@ -1,6 +1,6 @@
 # denpa
 
-[danything/denpa](https://github.com/danything/denpa) 1.39.0 の Home Assistant 向けアドオン（amd64）。上流公式の AIO イメージを使い、チューナーエージェントと本体を同一コンテナで動かす。
+[danything/denpa](https://github.com/danything/denpa) 1.40.0 の Home Assistant 向けアドオン（amd64）。上流公式の AIO イメージを使い、チューナーエージェントと本体を同一コンテナで動かす。
 
 チューナーを USB に挿して起動するだけでそのまま使える自宅用テレビ録画サーバである。設定ファイルは1行も書く必要がなく、番組表・予約・録画・ブラウザ再生を1つにまとめ、Mirakurun や EDCB を別に立てる必要がない。
 
