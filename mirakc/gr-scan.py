@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """受信可能な地上波チャンネルを走査して mirakc の channels 形式で出力する。
 
-px4-ts-stream / px-s1ud-stream が吐く TS を mirakc-arib scan-services に
+px4-ts / siano-ts が吐く TS を mirakc-arib scan-services に
 通して、放送中のサービスと名前（ARIB デコード済み）を得る。
 
 使い方:
-  gr-scan.py --px4-bin /usr/local/bin/px4-ts-stream --px4-model px_q3u4
-  gr-scan.py --siano-bin /usr/local/bin/px-s1ud-stream --siano-adapter 0
+  gr-scan.py --px4-bin /usr/local/bin/px4-ts --px4-instance INSTANCE --px4-receiver 2
+  gr-scan.py --siano-bin /usr/local/bin/siano-ts --siano-adapter 0
   gr-scan.py ... --replace-config /config/config.yml
 """
 
@@ -19,20 +19,12 @@ import subprocess
 import sys
 import time
 
-DEFAULT_CHANNELS = [f"T{n}" for n in range(13, 63)]
+from tuner_commands import CHANNEL, px4_command, siano_command
+
+# Japanese terrestrial broadcasting uses UHF 13..52; higher channels are
+# still accepted by the driver and can be requested explicitly via --channels.
+DEFAULT_CHANNELS = [f"T{n}" for n in range(13, 53)]
 CAPTURE_SECONDS = 12.0
-
-# モデルごとの最初の地上波受信機番号
-PX4_GR_RECEIVER = {
-    "px_q3u4": 2, "px_q3pe4": 2, "px_q3pe5": 2,
-    "px_w3u4": 2, "px_w3pe4": 2, "px_w3pe5": 2,
-    "px_mlt5pe": 0, "dtv02a_5ts_p": 0, "px_mlt8pe5": 0,
-    "px_mlt8pe3": 0,
-    "dtv02a_4ts_p": 0,
-    "px_m1ur": 0, "px_s1ur": 0, "dtv03a_1tu": 0,
-    "dtv02_1t1s_u": 0, "dtv02a_1t1s_u": 0,
-}
-
 
 def channel_name(services: list) -> str:
     """先頭の TV サービス名からチャンネル名を作る。"""
@@ -49,8 +41,10 @@ def scan_channel(args, channel: str) -> list:
     import tempfile
 
     ts_path = None
+    if args.settle_seconds:
+        time.sleep(args.settle_seconds)
     stream = subprocess.Popen(
-        list(args.stream_cmd) + [channel],
+        [channel if arg == CHANNEL else arg for arg in args.stream_cmd],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=args.stream_env,
@@ -79,7 +73,10 @@ def scan_channel(args, channel: str) -> list:
                 stream.wait(timeout=3)
             except Exception:
                 stream.kill()
+                stream.wait()
     stream_err = stream.stderr.read() if stream.stderr is not None else b""
+    stream.stdout.close()
+    stream.stderr.close()
 
     services = []
     if data:
@@ -175,41 +172,42 @@ def replace_gr_channels(config_path: str, found: list) -> bool:
     return True
 
 
+def stream_command(args):
+    """Use the actual selected receiver; do not infer it from the model."""
+    if args.px4_bin:
+        return px4_command(CHANNEL, instance=args.px4_instance, device=args.px4_device,
+                           receiver=args.px4_receiver, binary=args.px4_bin,
+                           runtime_dir=args.runtime_dir)
+    return siano_command(CHANNEL, device=args.siano_adapter, binary=args.siano_bin,
+                         firmware=args.siano_firmware)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--px4-bin")
-    parser.add_argument("--px4-model")
-    parser.add_argument("--px4-instance")
-    parser.add_argument("--px4-receiver")
-    parser.add_argument("--siano-bin")
+    drivers = parser.add_mutually_exclusive_group(required=True)
+    drivers.add_argument("--px4-bin")
+    drivers.add_argument("--siano-bin")
+    parser.add_argument("--px4-model", help=argparse.SUPPRESS)  # old callers; selection uses the plan
+    parser.add_argument("--px4-instance", default=os.environ.get("PX4_INSTANCE"))
+    parser.add_argument("--px4-device", default=os.environ.get("PX4_DEVICE"))
+    parser.add_argument("--px4-receiver", default=os.environ.get("PX4_RECEIVER"))
+    parser.add_argument("--runtime-dir", default=os.environ.get("PX4_RUNTIME_DIR"))
     parser.add_argument("--siano-adapter", default="0")
+    parser.add_argument("--siano-firmware", default=os.environ.get("PX_S1UD_FIRMWARE"))
     parser.add_argument("--arib-bin", default=os.environ.get("MIRAKC_ARIB", "mirakc-arib"))
     parser.add_argument("--channels", nargs="*", default=DEFAULT_CHANNELS)
     parser.add_argument("--replace-config")
     parser.add_argument("--capture-seconds", type=float, default=CAPTURE_SECONDS)
     args = parser.parse_args()
 
-    env = os.environ.copy()
-    if args.px4_bin and args.px4_model:
-        receiver = args.px4_receiver
-        if receiver is None:
-            receiver = PX4_GR_RECEIVER.get(args.px4_model)
-        if receiver is None:
-            print(f"unknown px4 model: {args.px4_model}", file=sys.stderr)
-            return 2
-        args.stream_cmd = [args.px4_bin]
-        env["PX4_PROFILE"] = args.px4_model
-        env["PX4_MODEL"] = args.px4_model
-        env["PX4_RECEIVER"] = str(receiver)
-        if args.px4_instance:
-            env["PX4_INSTANCE"] = args.px4_instance
-    elif args.siano_bin:
-        args.stream_cmd = [args.siano_bin]
-        env["PX_S1UD_ADAPTER"] = args.siano_adapter
-    else:
-        print("either --px4-bin/--px4-model or --siano-bin is required", file=sys.stderr)
-        return 2
-    args.stream_env = env
+    try:
+        args.stream_cmd = stream_command(args)
+        args.settle_seconds = float(os.environ.get("PX_S1UD_SETTLE_SECONDS", "0")) if args.siano_bin else 0
+        if args.settle_seconds < 0:
+            raise ValueError("PX_S1UD_SETTLE_SECONDS must not be negative")
+    except ValueError as exc:
+        parser.error(str(exc))
+    args.stream_env = os.environ.copy()
 
     found = []
     for channel in args.channels:

@@ -520,8 +520,11 @@ generate_effective_config()
         --output "$APP_CFG" \
         --siano-list "$tmp_dir/siano-list.txt" \
         --warmup-file "$tmp_dir/siano-warmup.txt" \
-        --q3u4-enabled "$q3u4_enabled"
-    if [ "$px4_plan_active" -eq 1 ] && [ -n "$PX4_PLAN" ]; then
+        --q3u4-enabled "$q3u4_enabled" \
+        --siano-bin "$SIANO_TS_BIN" \
+        --siano-firmware "$SIANO_FIRMWARE" \
+        --runtime-dir "$PX4_RUNTIME_DIR"
+    if [ -n "$PX4_PLAN" ]; then
         set -- "$@" --px4-plan "$PX4_PLAN"
     fi
     if ! python3 "$EFFECTIVE_CONFIG_HELPER" "$@"; then
@@ -631,7 +634,7 @@ fi
 # 初回起動時、地上波チャンネルを実測して GR 一覧を差し替える。
 scan_gr_channels()
 {
-    echo "地上波チャンネルをスキャンします（10分ほどかかります）。" >&2
+    echo "地上波 T13〜T52 をスキャンします（8分ほどかかります）。" >&2
     if python3 /usr/local/bin/gr-scan.py "$@" --replace-config "$USER_CFG"; then
         echo "地上波チャンネルを走査結果で更新しました。" >&2
     else
@@ -650,10 +653,11 @@ if [ "$first_boot" -eq 1 ]; then
         # shellcheck disable=SC2086
         set -- $scan_slot
         IFS=$old_ifs
-        scan_gr_channels --px4-bin /usr/local/bin/px4-ts-stream \
-            --px4-instance "$1" --px4-receiver "$2" --px4-model "$3"
+        scan_gr_channels --px4-bin "${PX4_TS_BIN:-/usr/local/bin/px4-ts}" \
+            --px4-instance "$1" --px4-receiver "$2" --runtime-dir "$PX4_RUNTIME_DIR"
     elif [ -s "$tmp_dir/siano-list.txt" ]; then
-        scan_gr_channels --siano-bin /usr/local/bin/px-s1ud-stream --siano-adapter 0
+        scan_gr_channels --siano-bin "$SIANO_TS_BIN" --siano-adapter 0 \
+            --siano-firmware "$SIANO_FIRMWARE"
     fi
 fi
 

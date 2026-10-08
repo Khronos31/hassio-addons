@@ -8,6 +8,7 @@ USER root
 
 COPY px-s1ud-stream px4-detect px4-ts-stream /usr/local/bin/
 COPY generate-effective-config.py /usr/local/bin/generate-effective-config.py
+COPY tuner_commands.py /usr/local/bin/tuner_commands.py
 COPY px4-plan.py /usr/local/bin/px4-plan.py
 COPY gr-scan.py /usr/local/bin/gr-scan.py
 COPY firmware-allowlist.txt px4-firmware-source.tsv /usr/share/mirakc-addon/
@@ -17,10 +18,10 @@ COPY config.yml.template /usr/share/mirakc-addon/config.yml.template
 COPY LICENCE.siano /usr/share/doc/isdbt_rio.LICENCE.siano
 
 RUN set -eux; \
-    siano_tag_object='6e68693b11a5f7918ce86e086b386ed47d4cb375'; \
-    siano_resolved_commit='d1f4e42810d5a2023ff4a6c31f798cb381026693'; \
-    px4_tag_object='cf38742618bb02db41a95def619fbff50e9eb0f3'; \
-    px4_resolved_commit='cf38742618bb02db41a95def619fbff50e9eb0f3'; \
+    siano_tag_object='7123f267a5f9280938a33494dba3a7142e622727'; \
+    siano_resolved_commit='89c240b8af021d55d81b3b90fce79a3690605811'; \
+    px4_tag_object='da5b9c2ba1c21ecdbc498ce14344faa50d283bd3'; \
+    px4_resolved_commit='7ad5f6691f77a9aa58c4097f8b6dfea77f6d9b6a'; \
     fwtool_version='v0.2.1'; \
     fwtool_commit='2b3f79b5bc5db56e8556bb28397f7d8f74b2adeb'; \
     recisdb_deb='https://github.com/kazuki0824/recisdb-rs/releases/download/1.2.4/recisdb_1.2.4-1_amd64.deb'; \

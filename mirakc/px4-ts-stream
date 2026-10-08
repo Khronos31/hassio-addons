@@ -1,219 +1,25 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
+# Compatibility for existing config.yml commands; new tuners call px4-ts directly.
 set -eu
-
-LC_ALL=C
-export LC_ALL
 
 if [ "$#" -ne 1 ]; then
     echo "Usage: px4-ts-stream CHANNEL" >&2
     exit 2
 fi
-
 channel=$1
-
-# px4d の endpoint は --instance (新形式) か --device (serial) のどちらかを選ぶ。
-# 複数筐体では px4d が instance で起動されるため instance を優先する。
 if [ -n "${PX4_INSTANCE:-}" ]; then
-    px4_target_option=--instance
-    px4_target_value=$PX4_INSTANCE
+    set -- --instance "$PX4_INSTANCE"
 elif [ -n "${PX4_DEVICE:-}" ]; then
-    px4_target_option=--device
-    px4_target_value=$PX4_DEVICE
+    set -- --device "$PX4_DEVICE"
 else
     echo "PX4_INSTANCE or PX4_DEVICE is required" >&2
     exit 2
 fi
-
-# PX4_MODEL が明示されていればそれを使う。無ければ旧来のシリアル長による推測。
-device_model=
-if [ -n "${PX4_MODEL:-}" ]; then
-    case $PX4_MODEL in
-        px_q3u4|px_q3pe4|px_q3pe5|px_w3u4|px_mlt5pe|dtv02a_5ts_p|px_w3pe4|px_w3pe5|px_mlt8pe3|px_mlt8pe5|dtv02a_4ts_p|px_m1ur|px_s1ur|dtv03a_1tu|dtv02_1t1s_u|dtv02a_1t1s_u)
-            device_model=$PX4_MODEL
-            ;;
-        *)
-            echo "Invalid PX4_MODEL: $PX4_MODEL" >&2
-            exit 2
-            ;;
-    esac
-    if [ -z "${PX4_INSTANCE:-}" ]; then
-        case $device_model in
-            px_q3u4|px_q3pe4|px_q3pe5)
-                case $PX4_DEVICE in
-                    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
-                    *)
-                        echo "Invalid PX4_DEVICE (expected 14 digits for $device_model): $PX4_DEVICE" >&2
-                        exit 2
-                        ;;
-                esac
-                ;;
-            *)
-                case $PX4_DEVICE in
-                    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
-                    *)
-                        echo "Invalid PX4_DEVICE (expected 15 digits for $device_model): $PX4_DEVICE" >&2
-                        exit 2
-                        ;;
-                esac
-                ;;
-        esac
-    fi
-else
-    if [ -n "${PX4_INSTANCE:-}" ]; then
-        echo "PX4_MODEL is required with PX4_INSTANCE" >&2
-        exit 2
-    fi
-    case $PX4_DEVICE in
-        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
-            device_model=px_q3u4
-            ;;
-        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
-            device_model=px_mlt5pe
-            ;;
-        *)
-            echo "Invalid PX4_DEVICE (expected 14 Q3U4 digits or 15 MLT5 digits): $PX4_DEVICE" >&2
-            exit 2
-            ;;
-    esac
-fi
-
-if [ -z "${PX4_RECEIVER+x}" ] || [ -z "$PX4_RECEIVER" ]; then
-    echo "PX4_RECEIVER is required" >&2
-    exit 2
-fi
-
-# モデルごとの地上波/衛星受信機の一覧。衛星なしモデルは空文字列。
-t_receivers()
-{
-    case $1 in
-        px_q3u4|px_q3pe4|px_q3pe5) echo '2 3 6 7' ;;
-        px_w3u4|px_w3pe4|px_w3pe5) echo '2 3' ;;
-        px_mlt5pe|dtv02a_5ts_p|px_mlt8pe5) echo '0 1 2 3 4' ;;
-        px_mlt8pe3) echo '0 1 2' ;;
-        dtv02a_4ts_p) echo '0 1 2 3' ;;
-        px_m1ur|px_s1ur|dtv03a_1tu|dtv02_1t1s_u|dtv02a_1t1s_u) echo '0' ;;
-        *) echo '' ;;
-    esac
-}
-
-s_receivers()
-{
-    case $1 in
-        px_q3u4|px_q3pe4|px_q3pe5) echo '0 1 4 5' ;;
-        px_w3u4|px_w3pe4|px_w3pe5) echo '0 1' ;;
-        px_mlt5pe|dtv02a_5ts_p|px_mlt8pe5) echo '0 1 2 3 4' ;;
-        px_mlt8pe3) echo '0 1 2' ;;
-        dtv02a_4ts_p) echo '0 1 2 3' ;;
-        px_m1ur|dtv02_1t1s_u|dtv02a_1t1s_u) echo '0' ;;
-        px_s1ur|dtv03a_1tu) echo '' ;;
-        *) echo '' ;;
-    esac
-}
-
-contains()
-{
-    word=$1
-    shift
-    for item in "$@"; do
-        [ "$item" = "$word" ] && return 0
-    done
-    return 1
-}
-
-runtime_dir=${PX4_RUNTIME_DIR:-/run/px4-userland}
-if [ -z "$runtime_dir" ]; then
-    echo "PX4_RUNTIME_DIR must not be empty" >&2
-    exit 2
-fi
-px4_ts_bin=${PX4_TS_BIN:-/usr/local/bin/px4-ts}
-if [ -z "$px4_ts_bin" ]; then
-    echo "PX4_TS_BIN must not be empty" >&2
-    exit 2
-fi
-
-system=
-frequency_khz=
-slot=
-
-case $channel in
-    T1[3-9]|T[2-5][0-9]|T6[0-2])
-        physical_channel=${channel#T}
-        # shellcheck disable=SC2046
-        if ! contains "$PX4_RECEIVER" $(t_receivers "$device_model"); then
-            echo "Receiver $PX4_RECEIVER cannot receive terrestrial channel on $device_model: $channel" >&2
-            exit 2
-        fi
-        system=isdb-t
-        frequency_khz=$((395142 + physical_channel * 6000))
-        ;;
-    BS[0-9][0-9]_[0-9]|BS[0-9][0-9]_1[01])
-        transponder=${channel#BS}
-        number=${transponder%_*}
-        slot=${transponder#*_}
-        case $number in
-            01|03|05|07|09|11|13|15|17|19|21|23) ;;
-            *)
-                echo "Invalid BS transponder: $channel" >&2
-                exit 2
-                ;;
-        esac
-        case $slot in
-            0|1|2|3|4|5|6|7|8|9|10|11) ;;
-            *)
-                echo "Invalid BS slot: $channel" >&2
-                exit 2
-                ;;
-        esac
-        # shellcheck disable=SC2046
-        if ! contains "$PX4_RECEIVER" $(s_receivers "$device_model"); then
-            echo "Receiver $PX4_RECEIVER cannot receive satellite channel on $device_model: $channel" >&2
-            exit 2
-        fi
-        number_value=${number#0}
-        system=isdb-s
-        frequency_khz=$((1049480 + ((number_value - 1) / 2) * 38360))
-        ;;
-    CS[0-9]|CS1[0-9]|CS2[0-4])
-        number=${channel#CS}
-        case $number in
-            2|4|6|8|10|12|14|16|18|20|22|24) ;;
-            *)
-                echo "Invalid CS transponder: $channel" >&2
-                exit 2
-                ;;
-        esac
-        # shellcheck disable=SC2046
-        if ! contains "$PX4_RECEIVER" $(s_receivers "$device_model"); then
-            echo "Receiver $PX4_RECEIVER cannot receive satellite channel on $device_model: $channel" >&2
-            exit 2
-        fi
-        system=isdb-s
-        frequency_khz=$((1613000 + ((number - 2) / 2) * 40000))
-        slot=0
-        ;;
-    *)
-        echo "Unsupported mirakc channel: $channel" >&2
-        exit 2
-        ;;
-esac
-
-if [ "$system" = isdb-t ]; then
-    exec "$px4_ts_bin" \
-        "$px4_target_option" "$px4_target_value" \
-        --receiver "$PX4_RECEIVER" \
-        --system "$system" \
-        --frequency-khz "$frequency_khz" \
-        --runtime-dir "$runtime_dir" \
-        --output -
-fi
-
-exec "$px4_ts_bin" \
-    "$px4_target_option" "$px4_target_value" \
+: "${PX4_RECEIVER:?PX4_RECEIVER is required}"
+# The driver validates channel syntax and receiver capabilities.
+exec "${PX4_TS_BIN:-/usr/local/bin/px4-ts}" "$@" \
     --receiver "$PX4_RECEIVER" \
-    --system "$system" \
-    --frequency-khz "$frequency_khz" \
-    --slot "$slot" \
-    --lnb-voltage 0 \
-    --runtime-dir "$runtime_dir" \
+    --channel "$channel" \
+    --runtime-dir "${PX4_RUNTIME_DIR:-/run/px4-userland}" \
     --output -
