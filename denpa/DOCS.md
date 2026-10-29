@@ -1,6 +1,6 @@
 # denpa
 
-[danything/denpa](https://github.com/danything/denpa) 2.5.0 の Home Assistant 向けアドオンである。上流公式の AIO イメージを使い、選局を担うチューナーエージェントと、UI や録画を担う本体を同一コンテナ内で動かす。
+[danything/denpa](https://github.com/danything/denpa) 2.17.1 の Home Assistant 向けアドオンである。上流公式の AIO イメージを使い、選局を担うチューナーエージェントと、UI や録画を担う本体を同一コンテナ内で動かす。
 
 チューナーを挿して起動すれば、そのまま使える自宅用テレビ録画サーバである。設定ファイルは1行も書く必要がない。番組表・予約・録画・ブラウザ再生を1つにまとめ、Mirakurun や EDCB を別に立てる必要がない。
 
@@ -49,6 +49,7 @@
 - denpa-tv などLAN内クライアントは、`http://<Home AssistantのIP>:3000/` へ直接接続する。既定のホストポートは構成タブで変更できる。
 - 自宅のプライベートネットワーク（`192.168.0.0/16`、`10.0.0.0/8`、`172.16.0.0/12`、`100.64.0.0/10`）以外からのアクセスは 403（アクセス拒否）となる。
 - Ingress の接続元は HA Supervisor（`172.30.32.2`）だけを信頼プロキシとして扱い、転送された実クライアントIPを上記ネットワーク許可範囲と照合する。
+- **2.17.1 への更新時の接続先名**: 上流で接続先の Host 名の検査が追加された。IP アドレス直書き、`localhost`、ドットのない名前、`.local` / `.lan` / `.home.arpa` / `.internal` / `.localhost` の名前は許可対象となる。通常の FQDN や Tailscale の `.ts.net` 名は、上流の `ALLOWED_HOSTS` に登録されていなければ 403 になる。現行アドオンにはこの変数の設定欄がないため、その名前ではアクセスせず、IP アドレスや `.local` 名を使う。Ingress で元の Host 名が転送される場合もこの制限を受ける。詳しくは [上流の認証ドキュメント](https://github.com/danything/denpa/blob/v2.17.1/docs/auth.md) を参照。
 
 ## 使い方
 
