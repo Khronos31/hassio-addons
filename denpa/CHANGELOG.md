@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.17.1.2
+
+- `ALLOWED_HOSTS=.ui.nabu.casa` を追加し、Nabu Casa 経由の Home Assistant Ingress が Host 名検査で 403 になる問題を修正
+- 先頭ドットはドメインと配下の名前を許可する上流仕様。`*` / `*.ui.nabu.casa` のグロブ形式は使えない
+- 既存の接続元ネットワーク・プロキシの許可範囲は変更なし。本家バージョンは 2.17.1 のまま
+
 ## 2.17.1.1
 
 - 上流 danything/denpa を 2.5.0 から 2.17.1 に更新

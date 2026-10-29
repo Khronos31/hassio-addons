@@ -1,5 +1,5 @@
 name: denpa
-version: "2.17.1.1"
+version: "2.17.1.2"
 slug: denpa
 description: "danything/denpa 2.17.1。PX4の同一シリアル筐体にも対応。BS/CS標準局を自動登録。EDCBやmirakcと同時にUSBは開かない。"
 url: https://github.com/danything/denpa
@@ -25,6 +25,9 @@ environment:
   TRUSTED_NETWORKS: 127.0.0.0/8,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10
   # HA Supervisor が Ingress の前段となる。X-Forwarded-For はこのIPからだけ信頼する。
   TRUSTED_PROXIES: 172.30.32.2/32
+  # 上流は先頭ドットでドメインと配下を許可する（* のグロブではない）。
+  # Nabu Casa の Ingress は元の Host 名を引き継ぐ。
+  ALLOWED_HOSTS: .ui.nabu.casa
   SHUTDOWN_WAIT: "15000"
 # denpa-tv 等の直接接続用。既定のホスト側ポートは構成タブで変更できる。
 ports:

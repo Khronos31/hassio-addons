@@ -49,7 +49,9 @@
 - denpa-tv などLAN内クライアントは、`http://<Home AssistantのIP>:3000/` へ直接接続する。既定のホストポートは構成タブで変更できる。
 - 自宅のプライベートネットワーク（`192.168.0.0/16`、`10.0.0.0/8`、`172.16.0.0/12`、`100.64.0.0/10`）以外からのアクセスは 403（アクセス拒否）となる。
 - Ingress の接続元は HA Supervisor（`172.30.32.2`）だけを信頼プロキシとして扱い、転送された実クライアントIPを上記ネットワーク許可範囲と照合する。
-- **2.17.1 への更新時の接続先名**: 上流で接続先の Host 名の検査が追加された。IP アドレス直書き、`localhost`、ドットのない名前、`.local` / `.lan` / `.home.arpa` / `.internal` / `.localhost` の名前は許可対象となる。通常の FQDN や Tailscale の `.ts.net` 名は、上流の `ALLOWED_HOSTS` に登録されていなければ 403 になる。現行アドオンにはこの変数の設定欄がないため、その名前ではアクセスせず、IP アドレスや `.local` 名を使う。Ingress で元の Host 名が転送される場合もこの制限を受ける。詳しくは [上流の認証ドキュメント](https://github.com/danything/denpa/blob/v2.17.1/docs/auth.md) を参照。
+- **接続先名の検査**: IP アドレス直書き、`localhost`、ドットのない名前、`.local` / `.lan` / `.home.arpa` / `.internal` / `.localhost` の名前は許可対象となる。アドオン 2.17.1.2 以降は `ALLOWED_HOSTS=.ui.nabu.casa` を設定し、Nabu Casa の標準 URL からの Ingress アクセスにも対応する。Ingress は元の Host 名を引き継ぐ。
+- **許可する名前の範囲**: 上流の先頭ドット指定は、そのドメイン自体と全階層のサブドメインを許可する。`.ui.nabu.casa` は自宅の1ホストだけに限定する指定ではなく、同ドメイン配下を許可する。`*` や `*.ui.nabu.casa` というグロブ形式は使えない。名前の許可とは別に、接続元ネットワークの検査も引き続き行う。
+- **独自ドメイン・Tailscale の名前**: Nabu Casa に独自ドメインを割り当てている場合や `.ts.net` 名で開く場合、その名前は上記設定には含まれない。現行アドオンには `ALLOWED_HOSTS` の追加設定欄がないため、Nabu Casa の標準 URL、IP アドレス、`.local` 名を使う。詳しくは [上流の認証ドキュメント](https://github.com/danything/denpa/blob/v2.17.1/docs/auth.md) を参照。
 
 ## 使い方
 
