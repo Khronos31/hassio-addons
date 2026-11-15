@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.46.0.1
+
+- 上流 danything/denpa を 2.43.0 から 2.46.0 に更新
+- Nabu Casa 向けの `ALLOWED_HOSTS=.ui.nabu.casa` は維持
+- ユーザー指示により検証は未実施
+
 ## 2.43.0.1
 
 - 上流 danything/denpa を 2.42.0 から 2.43.0 に更新
