@@ -1,7 +1,6 @@
 # PX-S1UD/PX-Q3U4 用 mirakc。recisdb が .deb のため Debian ベース。
-# The Q3U4 vendor archive is never included.  At runtime a pinned GPL fwtool
-# derives the firmware into the persistent add-on config volume after every
-# input and output has passed the pinned size/SHA-256 manifest.
+# The known Q3U4 firmware is bundled and verified before populating the cache.
+# The vendor ZIP and SYS are not included.
 FROM docker.io/mirakc/mirakc:3.4.88-debian@sha256:c2e4e13bfc510a3ab0fd02f6822adc2f6005b355e0a06d87cf4f3b36ff154900
 
 USER root
@@ -12,12 +11,15 @@ COPY tuner_commands.py /usr/local/bin/tuner_commands.py
 COPY px4-plan.py /usr/local/bin/px4-plan.py
 COPY gr-scan.py /usr/local/bin/gr-scan.py
 COPY firmware-allowlist.txt px4-firmware-source.tsv /usr/share/mirakc-addon/
+COPY it930x-firmware.bin /usr/share/mirakc-addon/it930x-firmware.bin
 COPY px4-acquire-firmware /usr/local/bin/px4-acquire-firmware
 COPY run.sh /run.sh
 COPY config.yml.template /usr/share/mirakc-addon/config.yml.template
 COPY LICENCE.siano /usr/share/doc/isdbt_rio.LICENCE.siano
 
 RUN set -eux; \
+    test "$(wc -c < /usr/share/mirakc-addon/it930x-firmware.bin)" -eq 2169; \
+    printf '%s  %s\n' '5213a5a38872661277a2cc1b2dfdfe88faf06f41205f460f3b51857f0568b484' /usr/share/mirakc-addon/it930x-firmware.bin | sha256sum -c -; \
     siano_tag_object='7123f267a5f9280938a33494dba3a7142e622727'; \
     siano_resolved_commit='89c240b8af021d55d81b3b90fce79a3690605811'; \
     px4_tag_object='da5b9c2ba1c21ecdbc498ce14344faa50d283bd3'; \
@@ -130,8 +132,10 @@ RUN set -eux; \
             'firmware_allowlist=/usr/share/mirakc-addon/firmware-allowlist.txt' \
             'firmware_source_manifest=/usr/share/mirakc-addon/px4-firmware-source.tsv' \
             'firmware_acquisition_helper=/usr/local/bin/px4-acquire-firmware' \
-            'q3u4_firmware_payload=excluded' \
-            'q3u4_vendor_archive=runtime-download-not-redistributed' \
+            'q3u4_firmware_payload=bundled-sha256-verified' \
+            'q3u4_firmware=/usr/share/mirakc-addon/it930x-firmware.bin' \
+            'q3u4_firmware_source=https://raw.githubusercontent.com/tsukumijima/px4_drv/c995c10138368283a720cec4fcbca157ccc0dbd3/etc/it930x-firmware.bin' \
+            'q3u4_vendor_archive=not-redistributed' \
             'siano_firmware=/lib/firmware/isdbt_rio.inp' \
             'siano_source_firmware=excluded' \
             'build_package_versions=/usr/share/mirakc-addon/build-package-versions.txt' \

@@ -76,24 +76,27 @@ PX4 の列挙や個体の特定が不完全な場合は、一部を黙って除�
 `isdbt_rio.inp` は linux-firmware の再配布可能なバイナリです。イメージに同梱し、
 著作権表示は `LICENCE.siano` をイメージ内へ入れています。ソースリポジトリの git には入れていません。
 
-`it930x-firmware.bin` はイメージに同梱しません。px4-userland 対応機種を検出した起動で
-有効なキャッシュがない場合、アドオンは PLEX の Web サイトから公式ドライバZIPを HTTPS で取得します。
-固定マニフェストにより、ZIP（サイズ/SHA-256）、ZIP内の完全一致するSYSエントリ
-（サイズ/SHA-256）、`fwtool` の出力（ファイル名/サイズ/SHA-256）を順番に検証します。
-ZIP内のディレクトリを展開せず、完全一致したSYSエントリだけを一時ファイルへストリームし、
-検証済み候補だけを同一ディレクトリで atomic rename します。
+`it930x-firmware.bin` はリポジトリとイメージに同梱します。PLEX の公式ドライバZIPの
+取得先が HTTP 404 になったため、3.4.88.3 から外部サイトに依存しない配置へ変更しました。
+px4-userland 対応機種を検出した起動では、有効な既存キャッシュを優先し、なければ
+同梱ファームのサイズ・SHA-256 を固定マニフェストと照合します。
+検証済み候補を同一ディレクトリで atomic rename し、破損品で既存キャッシュを置換しません。
 
-生成物は次へ永続キャッシュされます。
+配置先は次の永続キャッシュです。
 
 ```
 /addon_configs/<リポジトリID>_mirakc/it930x-firmware.bin
 ```
 
-有効なキャッシュはオフラインで再利用します。PLEX サイトに到達できない場合や検証に失敗した場合、
-既存キャッシュを上書きせず、px4 を無効化して PX-S1UD だけで起動を続けます。
-公式ZIP、SYS、生成ファームウェアはいずれもリポジトリとアドオンイメージへ含めません。
+初回もオフラインで配置できます。キャッシュも同梱ファームも検証できない場合は起動を止めます。
+公式ZIPとSYSは同梱しません。取得ヘルパーには同梱ファームがない場合の旧ZIP取得処理も
+残していますが、通常のアドオンイメージでは使用しません。
 
-生成には [nns779/px4_drv](https://github.com/nns779/px4_drv) v0.2.1
+同梱ファームの出所は [tsukumijima/px4_drv の固定コミット](https://github.com/tsukumijima/px4_drv/blob/c995c10138368283a720cec4fcbca157ccc0dbd3/etc/it930x-firmware.bin) です。
+サイズは 2,169 バイト、SHA-256 は
+`5213a5a38872661277a2cc1b2dfdfe88faf06f41205f460f3b51857f0568b484` で、従来の生成物の許可値と一致します。
+
+旧ZIP取得処理には [nns779/px4_drv](https://github.com/nns779/px4_drv) v0.2.1
 （commit `2b3f79b5bc5db56e8556bb28397f7d8f74b2adeb`）の `fwtool` と `fwinfo.tsv` を使います。
 対応する固定ソースは `/usr/share/src/px4_drv-0.2.1`、GPL-2.0 ライセンスは
 `/usr/share/doc/px4_drv-fwtool/LICENSE` に収録しています。siano-userland と px4-userland も
@@ -109,7 +112,7 @@ Ingress はありません。画面は EPGStation アドオンです。
 
 - **siano-ts を同梱**し、`/dev/bus/usb` から libusb で PX-S1UD を開きます
 - **px4-userland を同梱**し、対応機種の受信系とカード経路をユーザ空間で開きます
-- px4-userland 対応機種の検出時だけ、PLEX 配布物からファームウェアを検証付きで生成・永続キャッシュします
+- px4-userland 対応機種の検出時だけ、同梱ファームウェアを検証して永続キャッシュへ配置します
 - **recisdb decode** を tuner command の後ろに置き、B-CAS で解いた TS を mirakc へ渡します
 - **pcscd** を起動時に起こします
 - 録画機能は使いません。EPG キャッシュは `/data/epg` に残します

@@ -11,6 +11,15 @@ mirakc アドオンと同時に USB チューナーは開きません。どち�
 S1UR の地上波1受信機を接続すると、EDCB に計10本を自動登録します。M1UR の1受信機は
 地上波と BS/CS のどちらか一方に割り当て、同時に二重使用しません。
 
+## ファームウェア
+
+260904.5 以降は PX4 用の `it930x-firmware.bin` をリポジトリに同梱し、
+ビルド時の個別ダウンロードを行いません。イメージ内の配置先は従来どおり
+`/lib/firmware/it930x-firmware.bin` です。
+出所は [tsukumijima/px4_drv の固定コミット](https://github.com/tsukumijima/px4_drv/blob/c995c10138368283a720cec4fcbca157ccc0dbd3/etc/it930x-firmware.bin)。
+2,169 バイト、SHA-256 は
+`5213a5a38872661277a2cc1b2dfdfe88faf06f41205f460f3b51857f0568b484` で、従来のダウンロード品と同一です。
+
 ## 画面とポート
 
 - サイドバーの EDCB から Ingress で開けます（内部は 5510）

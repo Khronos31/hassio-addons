@@ -1,5 +1,5 @@
 #!/bin/sh
-# Download the vendor driver package and derive the PX-Q3U4 firmware cache.
+# Install the bundled firmware, or derive it from the vendor driver package.
 # The vendor archive, SYS file, and generated candidate are temporary only.
 set -eu
 
@@ -9,6 +9,7 @@ CDPATH=
 export CDPATH
 
 TARGET=${PX4_FW_TARGET:-/config/it930x-firmware.bin}
+BUNDLED=${PX4_FW_BUNDLED:-/usr/share/mirakc-addon/it930x-firmware.bin}
 MANIFEST=${PX4_FW_SOURCE_MANIFEST:-/usr/share/mirakc-addon/px4-firmware-source.tsv}
 FWTOOL_DIR=${PX4_FWTOOL_DIR:-/usr/libexec/mirakc-addon/px4-fwtool}
 CURL_BIN=${PX4_FW_CURL_BIN:-curl}
@@ -180,6 +181,31 @@ if [ -e "$TARGET" ] && [ ! -f "$TARGET" ]; then
 fi
 if verify_file "$TARGET" "$output_size" "$output_sha256"; then
     echo "PX-Q3U4 firmware cache verified: $TARGET" >&2
+    exit 0
+fi
+
+# Prefer the verified image payload so first startup needs no vendor download.
+if [ -e "$BUNDLED" ] || [ -L "$BUNDLED" ]; then
+    verify_file "$BUNDLED" "$output_size" "$output_sha256" || \
+        fail "bundled firmware failed size or SHA-256 verification"
+    target_dir=$(dirname "$TARGET") || fail "could not determine target directory"
+    [ -d "$target_dir" ] || fail "target directory does not exist: $target_dir"
+    candidate_tmp=$(mktemp "$target_dir/.px4-firmware.candidate.XXXXXX") || \
+        fail "could not create firmware candidate"
+    cp "$BUNDLED" "$candidate_tmp" || fail "could not copy bundled firmware"
+    verify_file "$candidate_tmp" "$output_size" "$output_sha256" || \
+        fail "copied firmware failed size or SHA-256 verification"
+    chmod 0644 "$candidate_tmp" || fail "could not set firmware mode"
+    if [ -L "$TARGET" ] || { [ -e "$TARGET" ] && [ ! -f "$TARGET" ]; }; then
+        fail "target cache changed to a symlink or non-regular file"
+    fi
+    if verify_file "$TARGET" "$output_size" "$output_sha256"; then
+        echo "PX-Q3U4 firmware cache was installed concurrently: $TARGET" >&2
+        exit 0
+    fi
+    mv -f "$candidate_tmp" "$TARGET" || fail "atomic firmware install failed"
+    candidate_tmp=
+    echo "PX-Q3U4 bundled firmware installed and verified: $TARGET" >&2
     exit 0
 fi
 

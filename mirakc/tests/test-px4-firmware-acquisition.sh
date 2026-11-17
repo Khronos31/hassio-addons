@@ -180,11 +180,12 @@ run_helper()
     stderr=$case_dir/helper.stderr
     env \
         PX4_FW_TARGET="$case_dir/cache/it930x-firmware.bin" \
+        PX4_FW_BUNDLED="${BUNDLED_FIXTURE:-$case_dir/no-bundle}" \
         PX4_FW_SOURCE_MANIFEST="$case_dir/manifest.tsv" \
-        PX4_FWTOOL_DIR="$case_dir/fwtool" \
+        PX4_FWTOOL_DIR="${FWTOOL_FIXTURE_DIR:-$case_dir/fwtool}" \
         PX4_FW_CURL_BIN="$case_dir/stubs/curl" \
-        PX4_FW_CONNECT_TIMEOUT_SECONDS=7 \
-        PX4_FW_TOTAL_TIMEOUT_SECONDS=19 \
+        PX4_FW_CONNECT_TIMEOUT_SECONDS="${CONNECT_TIMEOUT_FIXTURE:-7}" \
+        PX4_FW_TOTAL_TIMEOUT_SECONDS="${TOTAL_TIMEOUT_FIXTURE:-19}" \
         CURL_LOG="$case_dir/curl.log" \
         ARCHIVE_FIXTURE="$case_dir/archive.fixture" \
         CURL_MODE="${CURL_MODE:-success}" \
@@ -205,6 +206,37 @@ cp "$case_dir/PXW3U4.fixture" "$case_dir/cache/it930x-firmware.bin"
 CURL_MODE=fail run_helper || fail 'valid cache was not reused'
 assert_equal 0 "$(grep -c '^curl-call$' "$case_dir/curl.log" || :)" 'valid cache curl calls'
 assert_no_temp_residue "$case_dir/cache"
+
+new_case bundled_offline
+cp "$case_dir/PXW3U4.fixture" "$case_dir/bundled.bin"
+BUNDLED_FIXTURE="$case_dir/bundled.bin" CURL_MODE=fail \
+    FWTOOL_FIXTURE_DIR="$case_dir/no-fwtool" \
+    CONNECT_TIMEOUT_FIXTURE=invalid TOTAL_TIMEOUT_FIXTURE=invalid run_helper || \
+    fail 'offline bundled installation failed'
+cmp "$case_dir/PXW3U4.fixture" "$case_dir/cache/it930x-firmware.bin" || \
+    fail 'bundled firmware was not installed'
+assert_equal 644 "$(stat -c %a "$case_dir/cache/it930x-firmware.bin")" 'bundled installed mode'
+assert_equal 0 "$(grep -c '^curl-call$' "$case_dir/curl.log" || :)" 'bundle curl calls'
+assert_no_temp_residue "$case_dir/cache"
+
+new_case invalid_bundle
+printf '%s' 'old firmware sentinel' > "$case_dir/cache/it930x-firmware.bin"
+printf '%s' 'corrupt bundle' > "$case_dir/bundled.bin"
+if BUNDLED_FIXTURE="$case_dir/bundled.bin" run_helper; then
+    fail 'invalid bundle unexpectedly succeeded'
+fi
+assert_contains 'bundled firmware failed' "$case_dir/helper.stderr" 'bundle failure diagnostic'
+assert_equal 0 "$(grep -c '^curl-call$' "$case_dir/curl.log" || :)" 'invalid bundle curl calls'
+assert_old_target_unchanged 'invalid bundle'
+
+new_case valid_cache_bad_bundle
+cp "$case_dir/PXW3U4.fixture" "$case_dir/cache/it930x-firmware.bin"
+printf '%s' 'corrupt bundle' > "$case_dir/bundled.bin"
+BUNDLED_FIXTURE="$case_dir/bundled.bin" CURL_MODE=fail run_helper || \
+    fail 'valid cache was not preferred over corrupt bundle'
+cmp "$case_dir/PXW3U4.fixture" "$case_dir/cache/it930x-firmware.bin" || \
+    fail 'valid cache changed'
+assert_equal 0 "$(grep -c '^curl-call$' "$case_dir/curl.log" || :)" 'cache before bundle curl calls'
 
 new_case fetch_and_reuse
 run_helper || fail 'valid acquisition failed'
@@ -287,7 +319,16 @@ printf '%s\t%s\t%s\n' it930x-firmware.bin "$sys_size" "$sys_hash" > "$case_dir/a
 mkdir -p "$case_dir/app" "$case_dir/data" "$case_dir/runtime" "$case_dir/reader"
 cat > "$case_dir/stubs/detect" <<'EOF'
 #!/bin/sh
-printf '%s\n' 00001205000960
+printf '%s\n' '{}'
+EOF
+cat > "$case_dir/stubs/plan.py" <<'EOF'
+import sys
+from pathlib import Path
+
+Path(sys.argv[sys.argv.index('--plan') + 1]).write_text(
+    'enclosure q3u4 PX-Q3U4 fixture 00001205000960 1-1,1-2 2\n'
+    'slot q3u4 PX-Q3U4 fixture 00001205000960 0 S\n'
+)
 EOF
 chmod 755 "$case_dir/stubs/detect"
 env \
@@ -301,11 +342,13 @@ env \
     PX4_FIRMWARE_SOURCE_MANIFEST="$case_dir/manifest.tsv" \
     PX4_FIRMWARE_FETCH_BIN="$helper" \
     PX4_FWTOOL_DIR="$case_dir/fwtool" \
+    PX4_FW_BUNDLED="$case_dir/no-bundle" \
     PX4_FW_CURL_BIN="$case_dir/stubs/curl" \
     CURL_LOG="$case_dir/curl.log" \
     ARCHIVE_FIXTURE="$case_dir/archive.fixture" \
     CURL_MODE=block \
-    PX4_DETECT_BIN="$case_dir/stubs/detect" \
+    PX4D_BIN="$case_dir/stubs/detect" \
+    PX4_PLAN_HELPER="$case_dir/stubs/plan.py" \
     PX4_RUNTIME_DIR="$case_dir/runtime" \
     PX4_READER_CONFIG="$case_dir/reader/px4-userland.conf" \
     sh "$run_sh" > "$case_dir/run.stdout" 2> "$case_dir/run.stderr" &
@@ -346,17 +389,30 @@ assert_manifest_value output_sha256 5213a5a38872661277a2cc1b2dfdfe88faf06f41205f
     "$production_manifest" 'production output SHA-256'
 
 payload_paths=$(git -C "$addon_dir/.." ls-files --cached --others --exclude-standard | \
-    awk '{ path = tolower($0) } path ~ /(^|\/)(pxw3u4[^/]*\.zip|pxw3u4\.sys|it930x-firmware\.bin)$/ { print }')
-[ -z "$payload_paths" ] || fail "PLEX-derived payload is present in the repository: $payload_paths"
+    awk '{ path = tolower($0) } path ~ /(^|\/)(pxw3u4[^/]*\.zip|pxw3u4\.sys)$/ { print }')
+[ -z "$payload_paths" ] || fail "vendor ZIP or SYS is present in the repository: $payload_paths"
+for bundled in "$addon_dir/it930x-firmware.bin" "$addon_dir/../edcb/tuner/it930x-firmware.bin"; do
+    assert_equal 2169 "$(wc -c < "$bundled" | awk '{print $1}')" 'bundled firmware size'
+    assert_equal 5213a5a38872661277a2cc1b2dfdfe88faf06f41205f460f3b51857f0568b484 \
+        "$(sha256sum "$bundled" | awk '{print $1}')" 'bundled firmware SHA-256'
+done
 
 dockerfile=$addon_dir/Dockerfile
 assert_contains "fwtool_commit='2b3f79b5bc5db56e8556bb28397f7d8f74b2adeb'" \
     "$dockerfile" 'pinned fwtool commit'
 assert_contains 'source_fwtool=/usr/share/src/px4_drv-0.2.1' "$dockerfile" 'pinned fwtool source path'
 assert_contains 'fwtool_license=/usr/share/doc/px4_drv-fwtool/LICENSE' "$dockerfile" 'fwtool license path'
-assert_contains 'q3u4_firmware_payload=excluded' "$dockerfile" 'firmware payload exclusion manifest'
-if grep -Eq 'COPY .*(pxw3u4[^ ]*\.zip|PXW3U4\.sys|it930x-firmware\.bin)' "$dockerfile"; then
-    fail 'Dockerfile copies a PLEX-derived payload into the image'
+assert_contains 'q3u4_firmware_payload=bundled-sha256-verified' "$dockerfile" 'bundled payload manifest'
+assert_contains 'COPY it930x-firmware.bin /usr/share/mirakc-addon/it930x-firmware.bin' \
+    "$dockerfile" 'bundled payload image path'
+# Match literal shell source, rather than expanding the variable here.
+# shellcheck disable=SC2016
+assert_contains 'BUNDLED=${PX4_FW_BUNDLED:-/usr/share/mirakc-addon/it930x-firmware.bin}' \
+    "$helper" 'bundled payload helper path'
+assert_contains 'COPY --from=tuners /lib/firmware/it930x-firmware.bin /lib/firmware/it930x-firmware.bin' \
+    "$addon_dir/../edcb/Dockerfile" 'EDCB final image firmware path'
+if grep -Eq 'COPY .*(pxw3u4[^ ]*\.zip|PXW3U4\.sys)' "$dockerfile"; then
+    fail 'Dockerfile copies vendor ZIP or SYS into the image'
 fi
 
 echo 'PASS: PX-Q3U4 firmware acquisition fixtures'

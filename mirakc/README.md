@@ -36,13 +36,11 @@ siano-userland の `siano-ts --channel` に、mirakc のチャンネル表記を
 新しいテンプレートの `tuners` は空で、手動設定や独自ドライバを追加する場合だけ編集します。
 旧ラッパー名は既存設定の互換性のため残しています。
 
-PX-Q3U4 を検出し、`it930x-firmware.bin` の有効なキャッシュがない場合だけ、PLEX の
-Web サイトへ HTTPS 接続して公式ドライバZIPを取得します。ZIP、内部のSYS、生成物を固定の
-サイズと SHA-256 で検証し、固定版 `fwtool` で生成したファームウェアだけを
-`/addon_configs/<リポジトリID>_mirakc/it930x-firmware.bin` に永続キャッシュします。
-以後、有効なキャッシュがあればネットワークへ接続しません。PLEX サイトへの接続、取得、
-展開、検証のいずれかが失敗した場合は fail-closed で PX-Q3U4 を無効化し、PX-S1UD だけで
-起動を続けます。公式ZIP、SYS、生成ファームウェアはアドオンイメージに同梱していません。
+PX4 用の `it930x-firmware.bin` は同梱しています。有効な既存キャッシュを優先し、
+キャッシュがない場合は同梱ファームのサイズと SHA-256 を検証して
+`/addon_configs/<リポジトリID>_mirakc/it930x-firmware.bin` に配置します。
+初回もファーム取得のためのネットワーク接続は不要です。検証に失敗した場合は
+既存キャッシュを置換せず起動を止めます。公式ドライバZIPとSYSは同梱しません。
 
 EPGStation の `mirakurunPath` は、同じ HA 上なら次です。
 

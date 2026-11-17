@@ -78,7 +78,6 @@ RUN set -eux; \
     siano_firmware_url='https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/isdbt_rio.inp?id=e981caea6ed33c48d25b7dbf473327dbd01df163'; \
     siano_firmware_size='85840'; \
     siano_firmware_sha256='054520642d5d09cb7ab7d08dbd6fd9ba9365de56adf2e7d7d06927f9845ff818'; \
-    it930x_firmware_url='https://raw.githubusercontent.com/tsukumijima/px4_drv/c995c10138368283a720cec4fcbca157ccc0dbd3/etc/it930x-firmware.bin'; \
     it930x_firmware_sha256='5213a5a38872661277a2cc1b2dfdfe88faf06f41205f460f3b51857f0568b484'; \
     git init -q /tmp/siano; \
     git -C /tmp/siano remote add origin https://github.com/Khronos31/siano-userland.git; \
@@ -107,7 +106,8 @@ RUN set -eux; \
     install -m 0755 /tmp/px4-build/px4-ts /usr/local/bin/px4-ts; \
     install -m 0755 /tmp/px4-build/px4ctl /usr/local/bin/px4ctl; \
     install -D -m 0755 /tmp/px4-build/libpx4-userland-ifd.so /usr/lib/px4-userland/libpx4-userland-ifd.so; \
-    curl -fsSL -o /lib/firmware/it930x-firmware.bin "$it930x_firmware_url"; \
+    test "$(wc -c < /tmp/tuner/it930x-firmware.bin)" -eq 2169; \
+    install -D -m 0644 /tmp/tuner/it930x-firmware.bin /lib/firmware/it930x-firmware.bin; \
     printf '%s  %s\n' "$it930x_firmware_sha256" /lib/firmware/it930x-firmware.bin | sha256sum -c -; \
     curl -fsSL -o /tmp/recisdb.deb "$recisdb_deb"; \
     printf '%s  %s\n' "$recisdb_sha256" /tmp/recisdb.deb | sha256sum -c -; \
